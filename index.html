@@ -259,6 +259,10 @@ tfoot td{font-weight:700;border-bottom:0}
 .mesa ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .mesa li{display:flex;align-items:center;gap:8px;min-width:0}
 .mesa .seat{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--gold);font-family:var(--num);font-size:13px;font-weight:600}
+.mesa.cerrada{opacity:.55}
+.aviso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--red-soft);border:1px solid var(--red);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14px}
+.aviso b{color:var(--red)}
+.aviso .btn{margin-left:auto}
 .mesa li .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mesa li.out .nm{color:var(--muted);text-decoration:line-through;font-weight:500}
 .ptxt{font-size:.78em;font-weight:500;color:var(--muted);font-style:italic}
@@ -738,7 +742,26 @@ function vGame(gid,g){
 // Mesas: hasta MESA_MAX jugadores, una mesa; con más, dos mesas mitad y mitad.
 // Se eligen antes los dos que reparten; el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.
 const MESA_MAX=11;
-const tablesOf=g=>[g.tables?.m1||[],g.tables?.m2||[]].filter(t=>t.length);
+// Cada mesa es una lista donde la posición es el asiento; '' = asiento vacío (alguien se cambió de mesa).
+const tablesOf=g=>[g.tables?.m1||[],g.tables?.m2||[]].filter(t=>t.some(Boolean));
+const MESA_FINAL=9; // con esta cantidad o menos en juego, se juntan todos en la mesa 1
+// Qué hay que hacer con las mesas según quiénes siguen en juego: equilibrar, juntar o nada.
+function mesaAviso(g,c){
+  if(g.status==='closed')return null;
+  const m1=g.tables?.m1||[],m2=g.tables?.m2||[];
+  const vivos=t=>t.filter(id=>id&&c.alive.includes(id));
+  const a1=vivos(m1),a2=vivos(m2);
+  if(!a1.length||!a2.length)return null;
+  if(a1.length+a2.length<=MESA_FINAL)return {tipo:'juntar',n:a1.length+a2.length};
+  if(Math.abs(a1.length-a2.length)>=2)return a1.length>a2.length?{tipo:'pasar',de:1,a:2,n1:a1.length,n2:a2.length}:{tipo:'pasar',de:2,a:1,n1:a1.length,n2:a2.length};
+  return null;
+}
+function vAviso(g,c){
+  const av=mesaAviso(g,c),msg=ui.moveMsg&&ui.moveMsg.g===g.createdAt?`<div class="donemsg">${esc(ui.moveMsg.t)}</div>`:'';
+  if(!av)return msg;
+  if(av.tipo==='juntar')return msg+`<div class="aviso"><b>Mesa final:</b> quedan ${av.n} en juego. Se juntan todos en la Mesa 1.<button class="btn gold" data-act="mesaJuntar">Juntar en la Mesa 1</button></div>`;
+  return msg+`<div class="aviso"><b>Equilibrar mesas:</b> Mesa 1 tiene ${av.n1} y Mesa 2 tiene ${av.n2}. Pasa un jugador de la Mesa ${av.de} a la Mesa ${av.a}.<button class="btn gold" data-act="mesaPasar">Sortear quién pasa</button></div>`;
+}
 function rnd(n){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n}
 function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
 // El orden de cada lista es el asiento: el 1 reparte y del 2 en adelante se sortea.
@@ -752,20 +775,21 @@ function drawTables(playing,dealers){
 function vMesas(g,c){
   const n=c.playing.length;if(n<2)return '';
   const two=n>MESA_MAX,closed=g.status==='closed',dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
-  const tables=tablesOf(g).map(t=>t.filter(id=>c.playing.includes(id))).filter(t=>t.length);
-  const seated=new Set(tables.flat()),missing=c.playing.filter(id=>!seated.has(id));
-  const stale=tables.length&&(missing.length||tables.length!==(two?2:1));
+  const tables=tablesOf(g);
+  const seated=new Set(tables.flat().filter(Boolean)),missing=c.alive.filter(id=>!seated.has(id));
+  const stale=tables.length&&missing.length;
   const ready=!two||(dl.length===2&&dl[0]!==dl[1]);
   const sel=i=>`<label><span class="label">${two?'Repartidor '+(i+1):'Reparte (opcional)'}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
     ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl[1-i]===id?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
   const armed=ui.armed==='mesas';
-  const list=(t,i)=>`<div class="mesa"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${t.length} jugadores</span></h3><ol>${t.map((id,s)=>`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`;
+  const list=(t,i)=>{const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${two?'2 mesas':'1 mesa'}</span></div>
     <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad (si son impares, la mesa 1 lleva uno más). Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar. El número es el asiento: el 1 reparte y del 2 en adelante se sortea.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El número es el asiento: el 1 reparte (si no elegís quién, también se sortea) y del 2 en adelante se sortea.`}</p>
     <div class="fields">${two?sel(0)+sel(1):sel(0)}</div>
     ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas" ${ready?'':'disabled'}>${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button>
       ${ready?'':'<span class="small muted">Elegí a los dos que reparten para sortear.</span>'}</div>`}
+    ${vAviso(g,c)}
     ${stale?`<div class="err">Cambió la asistencia desde el sorteo${missing.length?': '+missing.map(pname).map(esc).join(', ')+' sin mesa':''}. Volvé a sortear.</div>`:''}
     ${tables.length?`<div class="mesas">${tables.map(list).join('')}</div>`:''}
   </section>`;
@@ -780,6 +804,7 @@ function vKO(g,c,ts){
   }).join('');
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Eliminaciones</h2><span class="badge gold">Quedan ${c.alive.length} de ${n}</span></div>
+    ${closed?'':vAviso(g,c)}
     ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${g.type==='mie'?'cuando arranca el reloj':'cuando se cierra el rebuy (al terminar el 10-20)'}.</p>`
       :winner?`<div class="donemsg">🏆 Ganó ${esc(pname(winner))}. Revisá el resultado y cerrá la partida.</div>`
       :`<p class="muted small" style="margin:0">Tocá dos veces a quien queda afuera. El primero en caer queda ${n}º.</p>`}
@@ -1164,6 +1189,28 @@ const ACT={
   toggleActive:d=>{const p=S.players[d.pid];Store.update('players',d.pid,{active:p.active===false})},
   delPlayer:d=>{if(ui.armed!=='delP-'+d.pid){arm('delP-'+d.pid);return}ui.armed=null;if(ui.me===d.pid)ACT.clearMe();Store.del('players',d.pid)},
   foodMode:d=>{const [gid]=currentGame();Store.update('games',gid,{foodMode:d.v})},
+  mesaPasar:()=>{
+    const [gid,g]=currentGame(),c=calc(g),av=mesaAviso(g,c);if(!av||av.tipo!=='pasar')return;
+    const T={1:(g.tables.m1||[]).slice(),2:(g.tables.m2||[]).slice()},de=T[av.de],a=T[av.a];
+    // pasa alguien en juego de la mesa más llena (nunca el que reparte, asiento 1) a un asiento libre de la otra
+    let cand=de.map((id,i)=>i).filter(i=>i>0&&de[i]&&c.alive.includes(de[i]));if(!cand.length)cand=de.map((id,i)=>i).filter(i=>de[i]&&c.alive.includes(de[i]));
+    const si=cand[rnd(cand.length)],pid=de[si];
+    const libres=a.map((id,i)=>i).filter(i=>i>0&&(!a[i]||!c.alive.includes(a[i])));
+    const ti=libres.length?libres[rnd(libres.length)]:a.length;
+    de[si]='';a[ti]=pid;
+    ui.moveMsg={g:g.createdAt,t:`${pname(pid)} pasa de la Mesa ${av.de} a la Mesa ${av.a}, asiento ${ti+1}.`};
+    Store.update('games',gid,{tables:{m1:T[1],m2:T[2]}});
+  },
+  mesaJuntar:()=>{
+    const [gid,g]=currentGame(),c=calc(g);
+    const m1=(g.tables.m1||[]).slice(),m2=(g.tables.m2||[]).slice();
+    const vienen=shuffle(m2.filter(id=>id&&c.alive.includes(id)));
+    const libres=shuffle(m1.map((id,i)=>i).filter(i=>i>0&&(!m1[i]||!c.alive.includes(m1[i]))));
+    const lugares=[];
+    for(const pid of vienen){const ti=libres.length?libres.shift():m1.length;m1[ti]=pid;m2[m2.indexOf(pid)]='';lugares.push(`${pname(pid)} al ${ti+1}`)}
+    ui.moveMsg={g:g.createdAt,t:`Mesa final en la Mesa 1. Asientos nuevos: ${lugares.join(', ')}.`};
+    Store.update('games',gid,{tables:{m1,m2}});
+  },
   mesas:()=>{
     const [gid,g]=currentGame();
     if(tablesOf(g).length&&ui.armed!=='mesas'){arm('mesas');return}ui.armed=null;
