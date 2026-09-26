@@ -73,10 +73,12 @@ input[type=number]{width:120px}
 .badge.gold{background:var(--gold-soft);color:var(--gold)}
 
 /* start */
-.start{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.start .opt{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;background:var(--surface);text-align:left}
-.start .opt.mie{border-top:4px solid var(--felt)} .start .opt.vie{border-top:4px solid var(--chip)}
-.start .opt ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
+.start,.typepick{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.start .opt,.typepick .opt{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;background:var(--surface);text-align:left}
+.opt.mie{border-top:4px solid var(--felt)!important} .opt.vie{border-top:4px solid var(--chip)!important}
+.opt .badge{align-self:flex-start}
+.fields input,.fields select{min-width:0}
+.opt ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
 @media (max-width:560px){.start{grid-template-columns:1fr}}
 
 .gamepick{display:flex;gap:6px;flex-wrap:wrap}
@@ -123,11 +125,51 @@ input[type=number]{width:120px}
 .rebuyst.closed{background:var(--chip);color:#fff}
 @media (max-width:560px){.tgrid{grid-template-columns:1fr}}
 
-.big{position:fixed;inset:0;z-index:50;background:var(--ink);color:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);text-align:center}
-.big .clock{font-size:clamp(96px,30vw,280px)}
-.big .blinds{font-size:clamp(40px,12vw,110px)}
-.big .tctl{justify-content:center}
-
+.proj{--chip:#E8766C;--gold:#E6B94F;--felt:#4DB387;--on-accent:#0A100D;--pbg:#0A100D;--pfg:#EEF3EF;--pmut:#8EA197;--pline:#22302A;
+  position:fixed;inset:0;z-index:50;background:var(--pbg);color:var(--pfg);color-scheme:dark;
+  display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto;gap:1.2vw 2.4vw;
+  padding:calc(env(safe-area-inset-top,0px) + 2.2vw) 2.4vw calc(env(safe-area-inset-bottom,0px) + 1.4vw);overflow:hidden}
+.proj .pmain{display:flex;flex-direction:column;justify-content:center;gap:1.2vw;min-width:0}
+.proj .phead{display:flex;align-items:center;gap:1vw;flex-wrap:wrap;font-family:var(--display);font-weight:600;font-size:clamp(16px,2vw,30px);color:var(--pmut);text-transform:uppercase;letter-spacing:.06em}
+.proj .phead b{color:var(--pfg)}
+.proj .clock{font-size:clamp(90px,17vw,340px);line-height:.85}
+.proj .pbl{display:flex;align-items:baseline;gap:2.4vw;flex-wrap:wrap}
+.proj .pbl .blinds{font-size:clamp(48px,8.5vw,170px);line-height:.9}
+.proj .pnext{font-family:var(--display);font-size:clamp(18px,2.4vw,44px);color:var(--pmut)}
+.proj .pnext b{color:var(--pfg)}
+.proj .plab{font-family:var(--display);font-weight:600;font-size:clamp(12px,1.2vw,20px);letter-spacing:.1em;text-transform:uppercase;color:var(--pmut)}
+.proj .rebuyst{font-size:clamp(15px,1.7vw,30px);padding:.5vw 1vw;align-self:flex-start;background:#1C2A24}
+.proj .rebuyst.closed{background:var(--chip);color:var(--on-accent)}
+.proj .pside{display:flex;flex-direction:column;gap:1.2vw;min-height:0;border-left:1px solid var(--pline);padding-left:2.4vw}
+.proj .ppot{font-family:var(--display);font-weight:700;font-size:clamp(34px,4.6vw,90px);line-height:.95}
+.proj .pprz{display:flex;flex-direction:column;gap:.3vw;font-family:var(--display);font-size:clamp(16px,1.9vw,34px)}
+.proj .pprz div{display:flex;justify-content:space-between;gap:1vw;border-bottom:1px solid var(--pline);padding-bottom:.2vw}
+.proj .pprz div:first-child b{color:var(--gold)}
+.proj .pplayers{list-style:none;margin:0;padding:0;columns:2;column-gap:2vw;font-size:clamp(13px,1.35vw,26px);overflow:hidden;min-height:0}
+.proj .pplayers li{break-inside:avoid;display:flex;justify-content:space-between;align-items:center;gap:.6vw;padding:.25vw 0;border-bottom:1px solid var(--pline)}
+.proj .pplayers li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.proj .pplayers.one{columns:1}
+.proj .pplayers svg{height:1.05em;width:auto;flex:none}
+.proj .ptag{font-family:var(--display);font-weight:700;font-size:.85em;letter-spacing:.04em;padding:0 .4em;border-radius:3px;white-space:nowrap;display:inline-flex;align-items:center;gap:.3em}
+.proj .ptag.used{background:var(--chip);color:var(--on-accent)}
+.proj .ptag.free{color:var(--pmut);border:1px solid var(--pline)}
+.proj .ladder{grid-column:1/-1}
+.proj .ladder span{font-size:clamp(12px,1.25vw,24px);border-color:#34443C;opacity:.6}
+.proj .ladder span.cur{background:var(--pfg);color:var(--pbg);opacity:1}
+.proj .tctl{grid-column:1/-1;justify-content:center;opacity:.35;transition:opacity .2s}
+.proj .tctl:hover,.proj .tctl:focus-within{opacity:1}
+.proj .tctl .btn{color:var(--pfg);border-color:#34443C;background:transparent}
+.proj .tctl .btn.pri{background:var(--felt);border-color:var(--felt);color:var(--on-accent)}
+@media (max-aspect-ratio:1/1){
+  .proj{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:auto;padding-left:16px;padding-right:16px}
+  .proj .pside{border-left:0;padding-left:0;border-top:1px solid var(--pline);padding-top:3vw}
+  .proj .clock{font-size:26vw}.proj .pbl .blinds{font-size:14vw}
+  .proj .pplayers{font-size:15px}
+}
+.sched{display:flex;flex-direction:column;gap:12px}
+.typepick{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.typepick .opt[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:-1px}
+@media (max-width:560px){.typepick{grid-template-columns:1fr}}
 /* tables */
 .tw{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -170,14 +212,14 @@ tfoot td{font-weight:700;border-bottom:0}
 const BLINDS=[1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,80,100,120,150,200,250,300,400,500,600,800,1000];
 const REBUY_CUT=BLINDS.indexOf(10); // el viernes el rebuy cierra al terminar 10-20
 const TYPES={
-  mie:{name:'Miércoles',min:7,pts:[5,2],split:[70,30]},
-  vie:{name:'Viernes',min:12,pts:[7,3,1],split:[60,30,10]}
+  mie:{name:'Rápido',dow:3,min:7,pts:[5,2],split:[70,30]},
+  vie:{name:'Con rebuy',dow:5,min:12,pts:[7,3,1],split:[60,30,10]}
 };
 const ST={no:'No va',juega:'Juega',come:'Juega + come'};
 
 /* ---------- estado ---------- */
 const S={players:{},games:{}};
-const ui={tab:'partida',gameId:null,statsType:'all',big:false,armed:null,editing:null,err:null,loaded:false};
+const ui={tab:'partida',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,armed:null,editing:null,err:null,loaded:false};
 try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
 
 /* ---------- almacenamiento: db compartida, o local si no hay ---------- */
@@ -293,36 +335,44 @@ function render(){
   tick(true);
 }
 
-function currentGame(){
-  const open=Object.entries(S.games).filter(([,g])=>g.status!=='closed').sort((a,b)=>b[1].date.localeCompare(a[1].date));
-  if(ui.gameId&&S.games[ui.gameId]) return [ui.gameId,S.games[ui.gameId],open];
-  ui.gameId=open[0]?.[0]||null;
-  return [ui.gameId,ui.gameId?S.games[ui.gameId]:null,open];
+function openGames(){
+  return Object.entries(S.games).filter(([,g])=>g.status!=='closed').sort((a,b)=>(a[1].date+(a[1].time||'')).localeCompare(b[1].date+(b[1].time||'')));
 }
+function currentGame(){
+  const open=openGames();
+  if(ui.gameId==='__new') return [null,null,open];
+  if(ui.gameId&&S.games[ui.gameId]) return [ui.gameId,S.games[ui.gameId],open];
+  // sin elección: la que tiene el reloj andando, si no la próxima por fecha, si no la última abierta
+  const pick=open.find(([,g])=>g.timer?.running)||open.find(([,g])=>g.date>=today())||open[open.length-1];
+  return pick?[pick[0],pick[1],open]:[null,null,open];
+}
+const gameLabel=g=>`${TYPES[g.type].name} · ${fmtDate(g.date)}${g.time?' '+g.time:''}`;
 
 function vPartida(){
   const [gid,g,open]=currentGame();
-  const picker=open.length>1||(open.length&&!g)||(g&&g.status==='closed')?`<div class="gamepick">${open.map(([id,x])=>`<button data-act="selGame" data-id="${id}" aria-current="${id===gid}">${TYPES[x.type].name} ${fmtDate(x.date)}</button>`).join('')}<button data-act="selGame" data-id="">+ Nueva</button></div>`:'';
+  const picker=open.length||(g&&g.status==='closed')?`<div class="row"><span class="label">Partidas programadas</span></div><div class="gamepick">${open.map(([id,x])=>`<button data-act="selGame" data-id="${id}" aria-current="${id===gid}"><span class="badge ${x.type}" style="font-size:11px;padding:0 5px">${x.type==='mie'?'R':'RB'}</span> ${fmtDate(x.date)}${x.time?' '+esc(x.time):''}</button>`).join('')}<button data-act="selGame" data-id="" aria-current="${!g}">+ Programar</button></div>`:'';
   if(!g) return picker+vNewGame();
   return picker+vGame(gid,g);
 }
 function vNewGame(){
   const np=Object.values(S.players).filter(p=>p.active!==false).length;
-  return `<section class="card">
-    <h2>Nueva partida</h2>
+  const ty=ui.newType,date=ui.newDate||nextDow(TYPES[ty].dow);
+  const opt=(k,title,items)=>`<button class="opt ${k}" data-act="newType" data-v="${k}" aria-pressed="${ty===k}">
+      <span class="badge ${k}">${TYPES[k].name}</span><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></button>`;
+  return `<section class="card sched">
+    <h2>Programar partida</h2>
     ${np?'':`<p class="muted">Primero cargá los jugadores en la solapa <b>Jugadores</b>.</p>`}
-    <div class="start">
-      <button class="opt mie" data-act="newGame" data-type="mie">
-        <span class="badge mie">Miércoles</span><h3>Poker rápido</h3>
-        <ul><li>Niveles de 7 min</li><li>1 recompra incluida en la entrada</li><li>Puntos 5 · 2</li><li>Premio 70 / 30</li></ul>
-        <span class="small muted">Fecha: ${fmtDate(nextDow(3))}</span>
-      </button>
-      <button class="opt vie" data-act="newGame" data-type="vie">
-        <span class="badge vie">Viernes</span><h3>Con rebuy y cena</h3>
-        <ul><li>Niveles de 12 min</li><li>Rebuys hasta terminar 10-20</li><li>Puntos 7 · 3 · 1</li><li>Premio 60 / 30 / 10</li></ul>
-        <span class="small muted">Fecha: ${fmtDate(nextDow(5))}</span>
-      </button>
+    <div class="typepick">
+      ${opt('mie','Tipo miércoles',['Niveles de 7 min','1 recompra incluida en la entrada','Puntos 5 · 2','Premio 70 / 30'])}
+      ${opt('vie','Tipo viernes',['Niveles de 12 min','Rebuys hasta terminar 10-20','Puntos 7 · 3 · 1','Premio 60 / 30 / 10'])}
     </div>
+    <div class="fields">
+      <label><span class="label">Fecha</span><input type="date" id="nd-date" data-chg="nd" data-k="newDate" value="${date}"></label>
+      <label><span class="label">Hora (opcional)</span><input type="time" id="nd-time" data-chg="nd" data-k="newTime" value="${esc(ui.newTime)}"></label>
+      <label><span class="label">Repetir semanalmente</span><select id="nd-reps" data-chg="nd" data-k="newReps">${[1,2,3,4,6,8,12].map(n=>`<option value="${n}" ${+ui.newReps===n?'selected':''}>${n===1?'Solo esta fecha':n+' semanas'}</option>`).join('')}</select></label>
+    </div>
+    <div class="row"><button class="btn ${ty==='mie'?'pri':'vie'}" data-act="newGame">Programar ${+ui.newReps>1?ui.newReps+' partidas':'partida'} ${TYPES[ty].name.toLowerCase()}</button>
+      <span class="small muted">${fmtDate(date)}${+ui.newReps>1?' y las '+(ui.newReps-1)+' semanas siguientes':''}</span></div>
   </section>`;
 }
 
@@ -346,8 +396,8 @@ function vGame(gid,g){
   return `
   <section class="card">
     <div class="row spread">
-      <div class="row"><span class="badge ${g.type}">${t.name}</span><h2>${fmtDate(g.date)}</h2>${closed?'<span class="badge gold">Cerrada</span>':''}</div>
-      <input type="date" id="g-date" data-chg="date" value="${esc(g.date)}" ${closed?'disabled':''} aria-label="Fecha">
+      <div class="row"><span class="badge ${g.type}">${t.name}</span><h2>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>${closed?'<span class="badge gold">Cerrada</span>':g.date>today()?'<span class="badge gold">Programada</span>':''}</div>
+      <div class="row"><input type="date" id="g-date" data-chg="date" value="${esc(g.date)}" ${closed?'disabled':''} aria-label="Fecha"><input type="time" id="g-time" data-chg="time" value="${esc(g.time||'')}" ${closed?'disabled':''} aria-label="Hora"></div>
     </div>
     <div class="sum">
       <div><span class="label">Juegan</span><b class="num">${c.playing.length}</b></div>
@@ -416,13 +466,10 @@ function vTimer(g,ts,big){
       <button class="btn" data-act="trestart" title="Reinicia el reloj del nivel actual">↺ Nivel</button>
       ${big?'':`<button class="btn" data-act="treset">Reset</button>`}
       <button class="btn" data-act="sound" aria-pressed="${ui.sound}">${ui.sound?'🔔':'🔕'}</button>
-      <button class="btn" data-act="big">${big?'Salir':'Pantalla completa'}</button>
+      <button class="btn" data-act="big">${big?'Salir (Esc)':'Proyectar'}</button>
     </div>`;
   const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}" data-t="rbst">${rbClosed?'Rebuy cerrado':ts.level===REBUY_CUT?'Último nivel con rebuy (10-20)':'Rebuy abierto hasta terminar 10-20'}</div>`:'';
-  if(big) return `<div class="label">${TYPES[g.type].name} · Nivel <span data-t="lvl">${ts.level+1}</span></div>
-      <div class="clock ${ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${mm}:${String(ss).padStart(2,'0')}</div>
-      <div class="blinds" data-t="blinds">${blind(ts.level)}</div>
-      <div class="label">Próximas <span data-t="next">${blind(ts.level+1)}</span></div>${rb}${ctl}`;
+  if(big) return {ctl,rb,mm,ss};
   const lad=BLINDS.map((b,i)=>`<span class="${i<ts.level?'past':i===ts.level?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`).join('');
   return `<section class="card timer">
     <div class="tgrid">
@@ -437,11 +484,42 @@ function vTimer(g,ts,big){
   </section>`;
 }
 function renderBig(){
-  const [,g]=ui.big?currentGame():[];
   const w=$('#bigwrap');
-  if(!ui.big||!g||ui.tab!=='partida'){w.innerHTML='';return}
-  w.innerHTML=`<div class="big">${vTimer(g,tstate(g),true)}</div>`;
+  const [,g]=ui.big?currentGame():[];
+  if(!ui.big){w.innerHTML='';return}
+  if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead">No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
+  const ts=tstate(g),t=TYPES[g.type],c=calc(g),vie=g.type==='vie',parts=g.parts||{};
+  const {ctl,rb,mm,ss}=vTimer(g,ts,true);
+  const players=c.playing.map(id=>({id,name:pname(id),p:parts[id]})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  const tag=x=>vie
+    ?(x.p.rb?`<span class="ptag">${tallySvg(x.p.rb)}<span class="num">${x.p.rb}</span></span>`:`<span class="ptag free">—</span>`)
+    :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Recompra disponible</span>`);
+  const lad=BLINDS.map((b,i)=>`<span class="${i<ts.level?'past':i===ts.level?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`).join('');
+  w.innerHTML=`<div class="proj" role="dialog" aria-label="Pantalla de juego">
+    <div class="pmain">
+      <div class="phead"><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· Nivel <b data-t="lvl">${ts.level+1}</b> de ${+g.levelMin||t.min} min</span></div>
+      <div class="clock ${ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${mm}:${String(ss).padStart(2,'0')}</div>
+      <div><div class="plab">Ciegas</div><div class="pbl"><div class="blinds">${blind(ts.level)}</div><div class="pnext">Próximas <b>${blind(ts.level+1)}</b></div></div></div>
+      ${ts.running?'':`<div class="plab" style="color:var(--gold)">${ts.el>0||ts.level>0?'En pausa':'Esperando para empezar'}</div>`}
+      ${rb}
+    </div>
+    <aside class="pside">
+      <div><div class="plab">Pozo · ${c.playing.length} jugadores${vie?` · ${c.rebuys} rebuys`:` · ${c.rebuys} recompras`}</div><div class="ppot num">${money(c.pot)}</div></div>
+      <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
+      <div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>
+      <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>`<li><span>${esc(x.name)}</span>${tag(x)}</li>`).join('')||'<li><span style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
+    </aside>
+    <div class="ladder" aria-label="Estructura de ciegas">${lad}</div>
+    ${ctl}
+  </div>`;
 }
+document.addEventListener('keydown',e=>{
+  if(!ui.big||e.target.closest('input,select,textarea'))return;
+  if(e.key==='Escape'){ACT.big()}
+  else if(e.key===' '){e.preventDefault();const [,g]=currentGame();if(g)(tstate(g).running?ACT.tpause:ACT.tplay)()}
+  else if(e.key==='ArrowRight')ACT.tnext();
+  else if(e.key==='ArrowLeft')ACT.tprev();
+});
 
 function tallySvg(n){
   if(!n) return '';
@@ -476,7 +554,7 @@ function vJugadores(){
 
 function vStats(){
   const st=stats(ui.statsType);
-  const tabs=[['all','Todos'],['mie','Miércoles'],['vie','Viernes']].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
+  const tabs=[['all','Todos'],['mie','Rápido'],['vie','Con rebuy']].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
   const rows=st.rows.filter(r=>r.pj||r.active);
   const pct=r=>r.eligible?Math.round(r.pj/r.eligible*100)+'%':'—';
   return `<section class="card">
@@ -493,7 +571,7 @@ function vHistorial(){
   const gs=Object.entries(S.games).sort((a,b)=>b[1].date.localeCompare(a[1].date));
   return `<section class="card"><h2>Historial</h2>
     ${gs.length?`<div class="hist">${gs.map(([id,g])=>{const c=calc(g),r=g.result||{};
-      return `<button data-act="openGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Mié':'Vie'}</span>
+      return `<button data-act="openGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
         <span><b>${fmtDate(g.date)}</b> · ${c.playing.length} jugadores${g.status==='closed'?'':' · <span class="badge gold">En curso</span>'}
         <span class="small muted" style="display:block">${r.p1?'🏆 '+esc(pname(r.p1)):''}${r.p2?' · 2º '+esc(pname(r.p2)):''}${r.p3?' · 3º '+esc(pname(r.p3)):''}</span></span>
         <span class="num">${money(c.pot)}</span></button>`}).join('')}</div>`:`<p class="empty">Sin partidas todavía.</p>`}
@@ -536,13 +614,22 @@ const ACT={
   clearErr:()=>{ui.err=null;render()},
   selGame:d=>{ui.gameId=d.id||null;if(!d.id){ui.gameId='__new'}render()},
   openGame:d=>{ui.gameId=d.id;ui.tab='partida';render();scrollTo(0,0)},
-  newGame:d=>{
-    const type=d.type,prev=Object.values(S.games).filter(g=>g.type===type).sort((a,b)=>b.date.localeCompare(a.date))[0]||{};
-    const id=uid('g'),g={type,date:nextDow(type==='mie'?3:5),status:'open',createdAt:Date.now(),
-      entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,parts:{},result:{},
-      timer:{running:false,anchor:0,acc:0,level:0}};
-    if(type==='vie')g.rebuyPrice=prev.rebuyPrice??prev.entry??'';
-    ui.gameId=id;Store.set('games',id,g);
+  newType:d=>{ui.newType=d.v;ui.newDate='';render()},
+  newGame:async()=>{
+    const type=ui.newType,prev=Object.values(S.games).filter(g=>g.type===type).sort((a,b)=>b.date.localeCompare(a.date))[0]||{};
+    const start=ui.newDate||nextDow(TYPES[type].dow),reps=+ui.newReps||1;
+    let first=null;
+    for(let i=0;i<reps;i++){
+      const [y,m,dd]=start.split('-').map(Number),dt=new Date(y,m-1,dd+7*i);
+      const date=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+      const id=uid('g'),g={type,date,time:ui.newTime||'',status:'open',createdAt:Date.now(),
+        entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,parts:{},result:{},
+        timer:{running:false,anchor:0,acc:0,level:0}};
+      if(type==='vie')g.rebuyPrice=prev.rebuyPrice??prev.entry??'';
+      first=first||id;
+      await Store.set('games',id,g);
+    }
+    ui.gameId=first;ui.newDate='';ui.newReps=1;render();
   },
   st:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
   rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
@@ -553,7 +640,7 @@ const ACT={
   trestart:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level})},
   treset:()=>{if(ui.armed!=='treset'){arm('treset');return}ui.armed=null;const [gid]=currentGame();setTimer(gid,{running:false,anchor:0,acc:0,level:0})},
   sound:()=>{ui.sound=!ui.sound;try{localStorage.setItem('poker.sound',ui.sound?'1':'0')}catch{}if(ui.sound)beep(1);render()},
-  big:()=>{ui.big=!ui.big;if(ui.big){try{document.documentElement.requestFullscreen?.().catch(()=>{})}catch{}}else{try{document.fullscreenElement&&document.exitFullscreen()}catch{}}render()},
+  big:()=>{ui.big=!ui.big;try{history.replaceState(null,'',ui.big?'#pantalla':location.pathname+location.search)}catch{}if(ui.big){try{document.documentElement.requestFullscreen?.().catch(()=>{})}catch{}}else{try{document.fullscreenElement&&document.exitFullscreen()}catch{}}render()},
   closeGame:()=>{const [gid]=currentGame();Store.update('games',gid,{status:'closed',closedAt:Date.now(),timer:{running:false}})},
   reopen:()=>{const [gid]=currentGame();Store.update('games',gid,{status:'open'})},
   delGame:()=>{if(ui.armed!=='delGame'){arm('delGame');return}ui.armed=null;const [gid]=currentGame();ui.gameId=null;Store.del('games',gid)},
@@ -567,6 +654,8 @@ function arm(k){ui.armed=k;render();clearTimeout(armT);armT=setTimeout(()=>{ui.a
 const CHG={
   rq:el=>{const [gid]=currentGame();Store.update('games',gid,{parts:{[el.dataset.pid]:{rq:el.checked}}})},
   num:el=>{const [gid]=currentGame();const v=el.value===''?'':Math.max(0,+el.value);Store.update('games',gid,{[el.dataset.k]:v})},
+  nd:el=>{ui[el.dataset.k]=el.value;render()},
+  time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
   pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value}})},
 };
@@ -589,10 +678,6 @@ document.addEventListener('submit',e=>{
     ui.editing=null;if(name)Store.update('players',pid,{name});else render();
   }
 });
-// "+ Nueva" muestra la pantalla de alta aunque haya otra partida abierta
-const _cg=currentGame;
-currentGame=function(){ if(ui.gameId==='__new'){const open=Object.entries(S.games).filter(([,g])=>g.status!=='closed').sort((a,b)=>b[1].date.localeCompare(a[1].date));return [null,null,open]} return _cg()};
-
 render();
 Store.init();
 </script>
