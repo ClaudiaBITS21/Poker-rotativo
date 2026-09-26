@@ -40,4 +40,4 @@ guarda en el navegador (localStorage).
 
 ## Video explicativo
 
-`video/liga-poker-tutorial.mp4` (2:33, vertical para celular, con voz en castellano rioplatense) recorre la app paso a paso con datos de ejemplo. El texto de la narración está en `video/narracion.json`; `video/voz.py` genera la voz (Piper es_AR "daniela" con sherpa-onnx) y `video/grabar.mjs` graba la app sincronizada con cada frase.
+`video/liga-poker-tutorial.mp4` (2:33, vertical para celular, con voz en castellano rioplatense) recorre la app paso a paso con datos de ejemplo. El texto de la narración está en `video/narracion.json`; `video/voz.py` genera la voz (Piper es_AR "daniela" con sherpa-onnx) `video/grabar.mjs` graba la app sincronizada con cada frase y `video/mezclar.py` agrega de marco la canción "Miércoles de Poker" (intro, pausa a mitad del video y cierre; bajita mientras habla la voz).
