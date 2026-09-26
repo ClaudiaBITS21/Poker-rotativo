@@ -40,4 +40,4 @@ guarda en el navegador (localStorage).
 
 ## Video explicativo
 
-`video/liga-poker-tutorial.mp4` recorre la app paso a paso con datos de ejemplo. Se regenera con `node video/grabar.mjs <carpeta>` (Playwright) y se convierte a MP4 con ffmpeg.
+`video/liga-poker-tutorial.mp4` (2:33, vertical para celular, con voz en castellano rioplatense) recorre la app paso a paso con datos de ejemplo. El texto de la narración está en `video/narracion.json`; `video/voz.py` genera la voz (Piper es_AR "daniela" con sherpa-onnx) y `video/grabar.mjs` graba la app sincronizada con cada frase.

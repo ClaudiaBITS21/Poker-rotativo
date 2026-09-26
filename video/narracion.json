@@ -1,0 +1,20 @@
+[
+ ["intro","Bienvenidos a la Liga de Poker. Te mostramos cómo funciona la app, en el mismo orden de una noche de juego."],
+ ["partidos","Al entrar, ves la pantalla de Partidos. Arriba, el partido en juego o el próximo. Después, los partidos donde todavía te podés anotar. Y abajo, los que ya se jugaron, con el podio de cada noche."],
+ ["jugadores","En Jugadores está la ficha de cada uno: partidas jugadas, puntos, y desde cuándo juega. Con Editar, se carga la mano favorita, la frase típica, y si juega miércoles y viernes, o solo los viernes."],
+ ["avatar","Tocando el avatar, cada uno elige su ficha, una carta, un emoji, o una foto."],
+ ["quien","Y arriba a la derecha elegís quién sos. Así, tu fila aparece primera y resaltada."],
+ ["programar","Para armar la noche, en Partida se programa el partido. El rápido de los miércoles tiene niveles de siete minutos. El de los viernes tiene rebuy, y niveles de doce minutos."],
+ ["asistencia","Cada uno marca si no va, si juega, o si juega y come. Arriba se ve cuántos entraron."],
+ ["mesas","Si son más de once, se juega en dos mesas. Elegís a los dos que reparten, tocás sortear, y la app manda a cada uno a una mesa distinta, y reparte al resto al azar."],
+ ["cuentas","En Cuentas se carga la entrada, el rebuy y la comida. La app calcula el pozo, los premios, y cuánto paga cada uno."],
+ ["reloj","Arranca el reloj. Muestra el nivel, las ciegas, y las próximas. Pita en el último minuto, y suena la alarma al terminar. El nivel no avanza solo: espera a que alguien toque arrancar el siguiente."],
+ ["rebuys","Mientras el rebuy está abierto, se suman con el más de cada jugador. Al terminar el diez veinte, el rebuy se cierra solo, y viene el break."],
+ ["elim","Con el rebuy cerrado, se marcan las eliminaciones: se toca dos veces a quien queda afuera. El orden en que caen define el puesto, y el contador de los que quedan va bajando."],
+ ["resultado","El resultado se completa solo con las eliminaciones, o se eligen los ganadores a mano, en cualquier momento. Al cerrar la partida, se suman los puntos."],
+ ["historial","La partida queda en Partidos jugados, con el primero, el segundo y el tercero."],
+ ["tabla","En la Tabla están los puntos del año, con la liga anterior incluida, y los de miércoles y viernes por separado. Deslizando, se ve la asistencia, los puestos, los rebuys y la plata ganada."],
+ ["pj","Y con Por partido jugado, se compara a quien va siempre con quien va poco."],
+ ["proyectar","Por último, Proyectar pone el reloj en pantalla completa para la tele, con las ciegas, el pozo, y quién sigue en juego."],
+ ["fin","Eso es todo. ¡A jugar! Y recuerden: nadie baja ganando."]
+]

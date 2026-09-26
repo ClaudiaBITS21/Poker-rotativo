@@ -1,5 +1,6 @@
-// Graba el video explicativo de la app con datos de ejemplo (formato celular vertical).
-// Uso: node video/grabar.mjs <carpeta-salida>  → deja un .webm; convertir a MP4 con ffmpeg.
+// Graba el video explicativo (celular vertical, al doble de resolución) sincronizado con la narración.
+// Pasos: 1) python3 video/voz.py genera cada frase de video/narracion.json con la voz es_AR "daniela" (Piper vía sherpa-onnx)
+// 2) node video/grabar.mjs <carpeta> (necesita dur.json y narr.json en esa carpeta) 3) ffmpeg une cuadros (frames.txt) y voz.
 import { chromium } from 'playwright';
 const NAMES=['Aldo','Alex','Casco','Coco','Cristian','Damian','El Negro Julian','Fantastica71','Firu','Gallego','Guido','Gusti','Jaime','Jorge','Juli','Matias','Mosca','Pablo','Pato','Pelado','Ricky','Rulo','Seba','Sombrero','Tato','Tommy','Willy'];
 const PREV={Casco:44,Ricky:43,Pelado:39,Coco:38,Pablo:34,Mosca:32,Alex:27,Gallego:26,Willy:21,Pato:19,Jaime:18,Jorge:16,Aldo:12,Damian:12,Firu:7,Gusti:4,Rulo:3,Guido:2,Matias:2,Seba:2,Tommy:2,Cristian:1};
@@ -22,14 +23,15 @@ const DATA=JSON.stringify({players,games});
 
 const OUT=process.argv[2]||'.';
 const b=await chromium.launch();
-const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,recordVideo:{dir:OUT,size:{width:780,height:1688}}});
+const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2});
 const pg=await ctx.newPage();
 await pg.addInitScript(d=>{if(!sessionStorage.getItem('seeded')){localStorage.clear();localStorage.setItem('poker.data',d);localStorage.setItem('poker.sound','0');sessionStorage.setItem('seeded','1')}},DATA);
+await pg.addInitScript(()=>{Element.prototype.requestFullscreen=function(){return Promise.resolve()}});
 await pg.addInitScript(()=>{
   window.addEventListener('DOMContentLoaded',()=>{
     const st=document.createElement('style');st.textContent=`
     #conn{display:none!important}
-    #cap{position:fixed;left:10px;right:10px;bottom:14px;z-index:999;pointer-events:none;background:rgba(15,12,9,.92);color:#F4EFE1;border:1.5px solid #D6A739;border-radius:16px;padding:12px 14px;font:500 15px/1.35 Figtree,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.5);transition:opacity .35s, transform .35s}
+    #cap{position:fixed;left:10px;right:10px;bottom:12px;z-index:999;pointer-events:none;background:rgba(15,12,9,.92);color:#F4EFE1;border:1.5px solid #D6A739;border-radius:16px;padding:12px 14px;font:500 15px/1.35 Figtree,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.5);transition:opacity .35s, transform .35s}
     #cap.hide{opacity:0;transform:translateY(10px)}
     #cap b{display:block;font:800 17px/1.2 "Playfair Display",Georgia,serif;color:#D6A739;margin-bottom:3px}
     #cap i{font-style:normal;color:#A8C5B5;font-size:12px;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:2px}
@@ -56,105 +58,56 @@ async function sel(selector,value){const l=pg.locator(selector);await l.evaluate
 async function typeIn(selector,text){const l=pg.locator(selector);await l.evaluate(e=>e.scrollIntoView({behavior:'smooth',block:'center'}));await W(400);await l.click();await l.fill('');await l.type(text,{delay:110});await l.press('Tab');await W(500)}
 async function top(){await pg.evaluate(()=>scrollTo({top:0,behavior:'smooth'}));await W(600)}
 
-// portada
-await pg.evaluate(()=>{const d=document.createElement('div');d.id='title';d.innerHTML='<div class="s">♠ ♥ ♦ ♣</div><h1>Liga de <em>Poker</em></h1><p>Cómo funciona la app, paso a paso, en el orden de una noche de juego</p>';document.body.appendChild(d)});
-await W(3200);await pg.evaluate(()=>{const d=document.getElementById('title');d.style.opacity=0;setTimeout(()=>d.remove(),600)});await W(700);
 
-// 1 inicio
-await cap('Partidos','La pantalla de inicio: el partido en juego, los próximos y el historial con el ganador de cada noche.');await W(2500);
-await pg.evaluate(()=>scrollTo({top:document.body.scrollHeight,behavior:'smooth'}));await W(2600);await top();
-
-// 2 jugadores
-await cap('Jugadores','Cada uno tiene su ficha con partidas, puntos y desde cuándo juega. Con <b style="display:inline;font:inherit;color:#D6A739">Editar</b> se carga el nombre, la mano favorita y la frase típica.');
-await tap('button[data-tab="jugadores"]',{scroll:false,wait:1600});
-await tap('button[data-act="edit"][data-pid="p_Coco"]',{wait:900});
-await W(2200);await tap('button[data-act="editCancel"]',{wait:500});
-await cap('Tu avatar','Tocá el avatar para elegir ficha, carta, emoji o foto.',false);
-await tap('button[data-act="avOpen"][data-pid="p_Willy"]',{wait:900});
-await tap('button[data-act="avTab"][data-v="emo"]',{scroll:false,wait:600});
-await tap('button[data-act="avSet"][data-f="e"][data-v="🦁"]',{scroll:false,wait:500});
-await tap('button[data-act="avSet"][data-f="c"][data-v="5"]',{scroll:false,wait:700});
-await tap('button[data-act="avSave"]',{scroll:false,wait:600});
+import fs from 'fs';
+const DUR=JSON.parse(fs.readFileSync(OUT+'/dur.json','utf8'));
+const NARR=Object.fromEntries(JSON.parse(fs.readFileSync(OUT+'/narr.json','utf8')));
+// captura cuadro por cuadro al doble de resolución (el grabador de Playwright graba a la mitad)
+fs.rmSync(OUT+'/frames',{recursive:true,force:true});fs.mkdirSync(OUT+'/frames');
+const cdp=await ctx.newCDPSession(pg);const frames=[];let fi=0;
+cdp.on('Page.screencastFrame',async f=>{const n=String(fi++).padStart(5,'0');fs.writeFileSync(`${OUT}/frames/${n}.jpg`,Buffer.from(f.data,'base64'));frames.push({n,t:f.metadata.timestamp});cdp.send('Page.screencastFrameAck',{sessionId:f.sessionId}).catch(()=>{})});
+await cdp.send('Page.startScreencast',{format:'jpeg',quality:88,maxWidth:780,maxHeight:1688,everyNthFrame:1});
+await W(500);
+const T0=Date.now()/1000;const marks=[];
+// mantiene el cuadro "vivo" aunque no cambie nada (el screencast solo manda cuadros cuando algo cambia)
+await pg.evaluate(()=>{const d=document.createElement('div');d.style.cssText='position:fixed;right:0;bottom:0;width:1px;height:1px;z-index:9999;pointer-events:none';document.body.appendChild(d);let o=0;setInterval(()=>{o=o?0:.01;d.style.background=`rgba(0,0,0,${o})`},90)});
+async function scene(key,title,fn=async()=>{}){
+  marks.push({key,t:Date.now()/1000-T0});
+  if(title) await cap(title,NARR[key],false);
+  await Promise.all([fn(),W(DUR[key]*1000+450)]);
+}
+await pg.evaluate(()=>{const d=document.createElement('div');d.id='title';d.innerHTML='<div class="s">♠ ♥ ♦ ♣</div><h1>Liga de <em>Poker</em></h1><p>Cómo funciona la app, paso a paso</p>';document.body.appendChild(d)});
+await scene('intro',null);
+await pg.evaluate(()=>{const d=document.getElementById('title');d.style.opacity=0;setTimeout(()=>d.remove(),600)});await W(500);
+await scene('partidos','Partidos',async()=>{await W(3500);await pg.evaluate(()=>scrollTo({top:document.body.scrollHeight,behavior:'smooth'}));await W(3500);await top()});
+await scene('jugadores','Jugadores',async()=>{await tap('button[data-tab="jugadores"]',{scroll:false,wait:2500});await tap('button[data-act="edit"][data-pid="p_Coco"]',{wait:3500});await tap('button[data-act="editCancel"]',{wait:300})});
+await scene('avatar','Tu avatar',async()=>{await tap('button[data-act="avOpen"][data-pid="p_Willy"]',{wait:600});await tap('button[data-act="avTab"][data-v="emo"]',{scroll:false,wait:500});await tap('button[data-act="avSet"][data-f="e"][data-v="🦁"]',{scroll:false,wait:400});await tap('button[data-act="avSet"][data-f="c"][data-v="5"]',{scroll:false,wait:500});await tap('button[data-act="avSave"]',{scroll:false,wait:200})});
 await top();
-await cap('¿Quién sos?','Arriba a la derecha cada uno elige quién es: su fila aparece primera y resaltada.',false);
-await sel('#me-sel','p_Willy');await W(1200);
-
-// 3 programar
-await cap('Programar la partida','Rápido (miércoles): niveles de 7 min, puntos 5·2. Con rebuy (viernes): niveles de 12 min, puntos 7·3·1. Se puede repetir varias semanas.');
-await pg.evaluate(()=>{ui.newDate=today()});
-await tap('button[data-tab="partida"]',{scroll:false,wait:2200});
-await tap('button[data-act="newType"][data-v="vie"]',{wait:1500});
-await pg.evaluate(()=>{ui.newDate=today();render()});await W(300);
-await tap('button[data-act="newGame"]',{wait:1200});await top();
-
-// 4 asistencia
-await cap('Asistencia','Cada uno marca ✕ no va, ♠ juega o 🍽 juega y come. Arriba se ve cuántos entraron.');
-await show('.alist');
+await scene('quien','¿Quién sos?',async()=>{await W(1200);await sel('#me-sel','p_Willy')});
+await scene('programar','Programar la partida',async()=>{await tap('button[data-tab="partida"]',{scroll:false,wait:3000});await tap('button[data-act="newType"][data-v="vie"]',{wait:1500});await pg.evaluate(()=>{ui.newDate=today();render()});await W(300);await tap('button[data-act="newGame"]',{wait:600});await top()});
 const plays=['Willy','Aldo','Alex','Casco','Coco','Firu','Gallego','Gusti','Jaime','Jorge','Mosca','Pablo','Pelado','Ricky'];
-for(const [i,n] of plays.entries()){await tap(`button[data-act="st"][data-pid="${id(n)}"][data-v="${i%3===0?'come':'juega'}"]`,{wait:i<3?450:180})}
-for(const n of ['Rulo','Sombrero']) await tap(`button[data-act="st"][data-pid="${id(n)}"][data-v="no"]`,{wait:200});
-await W(600);await top();await W(1600);
-
-// 5 mesas
-await cap('Mesas','Con más de 11 se juega en dos mesas. Se eligen los dos que reparten y la app sortea: cada uno a una mesa distinta y el resto al azar. Si son impares, la mesa 1 lleva uno más.');
-await show('.card:has(h2:text("Mesas"))');await W(1500);
-await sel('#dl-0',id('Ricky'));await sel('#dl-1',id('Pablo'));
-await tap('button[data-act="mesas"]',{wait:900});await show('.mesas');await W(3000);
-
-// 6 cuentas
-await cap('Cuentas','Se carga la entrada, el rebuy y la comida (total o por persona). La app calcula el pozo, los premios y cuánto paga cada uno.');
-await typeIn('#g-entry','20000');await typeIn('#g-rbp','20000');
-await tap('button[data-act="foodMode"][data-v="pp"]',{wait:500});await typeIn('#g-foodpp','25000');
-await show('.prizes');await W(2600);
-
-// 7 reloj
+await scene('asistencia','Asistencia',async()=>{await show('.alist');for(const [i,n] of plays.entries()){await tap(`button[data-act="st"][data-pid="${id(n)}"][data-v="${i%3===0?'come':'juega'}"]`,{wait:i<3?350:130})}await top()});
+await scene('mesas','Mesas',async()=>{await show('.card:has(h2:text("Mesas"))');await W(800);await sel('#dl-0',id('Ricky'));await sel('#dl-1',id('Pablo'));await tap('button[data-act="mesas"]',{wait:600});await show('.mesas')});
+await scene('cuentas','Cuentas',async()=>{await typeIn('#g-entry','20000');await typeIn('#g-rbp','20000');await tap('button[data-act="foodMode"][data-v="pp"]',{wait:300});await typeIn('#g-foodpp','25000');await show('.prizes')});
 await top();
-await cap('El reloj','Muestra nivel, ciegas y próximas. Pita en el último minuto y suena la alarma al llegar a 0:00. El nivel no avanza solo: se espera a "Arrancar siguiente".');
-await show('.timer');await tap('button[data-act="tplay"]',{wait:2500});
-await cap('Rebuys','En Con rebuy se suman con + por jugador, hasta que termina el 10-20. Después se bloquean solos.',false);
-await show('.alist');
-for(const n of ['Casco','Coco','Casco','Gusti','Ricky']) await tap(`button[data-act="rb"][data-pid="${id(n)}"][data-d="1"]`,{wait:350});
-await W(800);
-await show('.timer');
-for(let i=0;i<8;i++) await tap('button[data-act="tnext"]',{wait:320,scroll:false});
-await W(1800);
-
-// 8 eliminaciones
-await cap('Eliminaciones','Con el rebuy cerrado se habilitan. Se toca dos veces a quien queda afuera: el orden en que caen define el puesto. "Quedan" va bajando.');
-await show('.kolist');
-for(const n of ['Gallego','Jaime','Firu','Aldo']){await tap(`button[data-act="ko"][data-pid="${id(n)}"]`,{wait:350});await tap(`button[data-act="ko"][data-pid="${id(n)}"]`,{wait:500})}
-await show('.kos');await W(1500);await top();await W(1800);
-
-// 9 resultado
-await cap('Resultado','Se completa solo con las eliminaciones… o se eligen los ganadores a mano en cualquier momento. Al cerrar, se suman los puntos.');
-await show('#res-p1');
-await sel('#res-p1',id('Casco'));await sel('#res-p2',id('Coco'));await sel('#res-p3',id('Willy'));
-await show('.podium');await W(2000);
-await tap('button[data-act="closeGame"]',{wait:1500});
-
-// 10 inicio con jugado
-await cap('Historial','La partida queda en "Partidos jugados" con su ganador y el pozo.');
-await tap('button[data-tab="inicio"]',{scroll:false,wait:600});
-await show('.hist');await W(2600);
-
-// 11 tabla
-await cap('Tabla','Puntos del año (incluye la liga anterior), con Mié y Vie como referencia, asistencia, puestos, rebuys y plata ganada. Deslizá la tabla para ver todo.');
-await tap('button[data-tab="stats"]',{scroll:false,wait:2200});await show('table');
-await pg.locator('.tw').evaluate(e=>e.scrollTo({left:e.scrollWidth,behavior:'smooth'}));await W(2000);await pg.locator('.tw').evaluate(e=>e.scrollTo({left:0,behavior:'smooth'}));await W(1000);
-await top();
-await cap('Por partido jugado','Para comparar a quien va siempre con quien va poco: puntos por partida, % de victorias y de podios.',false);
-await tap('button[data-act="statsMode"][data-v="pj"]',{scroll:false,wait:3200});
-
-// 12 proyectar
-await cap('Proyectar','Con "Proyectar" el reloj va a pantalla completa para la tele: ciegas, pozo, premios y quién sigue en juego.');
-await pg.evaluate(()=>{ui.gameId=Object.keys(S.games).find(k=>!k.startsWith('h'))});
-await tap('button[data-tab="partida"]',{scroll:false,wait:900});
-await show('.timer');await tap('button[data-act="big"]',{scroll:false,wait:4200});
-await tap('.proj button[data-act="big"]',{scroll:false,wait:600});
-
-// cierre
-await capHide();
+await scene('reloj','El reloj',async()=>{await show('.timer');await tap('button[data-act="tplay"]',{wait:500})});
+await scene('rebuys','Rebuys',async()=>{await show('.alist');for(const n of ['Casco','Coco','Casco','Gusti','Ricky']) await tap(`button[data-act="rb"][data-pid="${id(n)}"][data-d="1"]`,{wait:250});await show('.timer');for(let i=0;i<8;i++) await tap('button[data-act="tnext"]',{wait:200,scroll:false})});
+await scene('elim','Eliminaciones',async()=>{await show('.kolist');for(const n of ['Gallego','Jaime','Firu','Aldo']){await tap(`button[data-act="ko"][data-pid="${id(n)}"]`,{wait:250});await tap(`button[data-act="ko"][data-pid="${id(n)}"]`,{wait:350})}await show('.kos');await W(600);await top()});
+await scene('resultado','Resultado',async()=>{await show('#res-p1');await sel('#res-p1',id('Casco'));await sel('#res-p2',id('Coco'));await sel('#res-p3',id('Willy'));await show('.podium');await W(900);await tap('button[data-act="closeGame"]',{wait:300})});
+await scene('historial','Partidos jugados',async()=>{await tap('button[data-tab="inicio"]',{scroll:false,wait:500});await show('.played')});
+await scene('tabla','Tabla',async()=>{await tap('button[data-tab="stats"]',{scroll:false,wait:1800});await show('table');await pg.locator('.tw').evaluate(e=>e.scrollTo({left:e.scrollWidth,behavior:'smooth'}));await W(2200);await pg.locator('.tw').evaluate(e=>e.scrollTo({left:0,behavior:'smooth'}));await W(800);await top()});
+await scene('pj','Por partido jugado',async()=>{await tap('button[data-act="statsMode"][data-v="pj"]',{scroll:false,wait:300})});
+await scene('proyectar','Proyectar',async()=>{await pg.evaluate(()=>{ui.gameId=Object.keys(S.games).find(k=>!k.startsWith('h'))});await tap('button[data-tab="partida"]',{scroll:false,wait:500});await show('.timer');await tap('button[data-act="big"]',{scroll:false,wait:300})});
+await tap('.proj button[data-act="big"]',{scroll:false,wait:300});await capHide();
 await pg.evaluate(()=>{const d=document.createElement('div');d.id='title';d.innerHTML='<div class="s">♠ ♥ ♦ ♣</div><h1>¡A <em>jugar</em>!</h1><p>Nadie baja ganando</p>';document.body.appendChild(d)});
-await W(3000);
-await ctx.close();await b.close();
-console.log('ok');
+await scene('fin',null);await W(800);
+const TEND=Date.now()/1000;
+await cdp.send('Page.stopScreencast');await W(300);
+// lista de cuadros con su duración, relativa a T0
+const lst=[];const fr=frames.filter(f=>f.t>=T0-0.2);
+for(let i=0;i<fr.length;i++){const d=(i+1<fr.length?fr[i+1].t:TEND)-fr[i].t;lst.push(`file 'frames/${fr[i].n}.jpg'\nduration ${Math.max(d,0.001).toFixed(4)}`)}
+lst.push(`file 'frames/${fr[fr.length-1].n}.jpg'`);
+fs.writeFileSync(OUT+'/frames.txt',lst.join('\n'));
+const first=fr[0].t-T0;
+fs.writeFileSync(OUT+'/marks.json',JSON.stringify({marks:marks.map(m=>({...m,t:m.t-first})),total:TEND-fr[0].t},null,1));
+await ctx.close();await b.close();console.log('frames',fr.length,'total',(TEND-fr[0].t).toFixed(1));
