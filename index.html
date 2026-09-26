@@ -527,6 +527,17 @@ async function fileToAvatar(file){
 }
 
 /* ---------- cálculos ---------- */
+// Premios: el 1º se redondea para arriba a la decena; lo que sobra se reparte entre los demás
+// en la misma proporción, redondeando para arriba el 2º; el último se lleva el resto (el pozo cierra exacto).
+const REDONDEO=10;
+function splitPot(pot,split){
+  const out=[];let rest=pot,share=split.reduce((a,b)=>a+b,0);
+  split.forEach((p,i)=>{
+    const v=i===split.length-1?rest:Math.min(rest,Math.ceil(rest*p/share/REDONDEO)*REDONDEO);
+    out.push(v);rest-=v;share-=p;
+  });
+  return out;
+}
 function calc(g){
   const t=TYPES[g.type],parts=g.parts||{};
   const playing=Object.keys(parts).filter(id=>parts[id].st==='juega'||parts[id].st==='come');
@@ -534,8 +545,7 @@ function calc(g){
   const rebuys=g.type==='vie'?playing.reduce((s,id)=>s+(parts[id].rb||0),0):playing.filter(id=>parts[id].rq).length;
   const entry=+g.entry||0,rbp=+g.rebuyPrice||0,food=+g.food||0;
   const pot=entry*playing.length+rbp*rebuys;
-  const prizes=t.split.map(p=>Math.floor(pot*p/100));
-  prizes[0]+=pot-prizes.reduce((a,b)=>a+b,0);
+  const prizes=splitPot(pot,t.split);
   // comida: se carga el total (se divide entre los que comen) o directamente el monto por persona
   const perPerson=g.foodMode==='pp',foodPP=+g.foodPP||0;
   const foodShare=perPerson?foodPP:(eaters.length?food/eaters.length:0);
