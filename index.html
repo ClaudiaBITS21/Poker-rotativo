@@ -527,9 +527,9 @@ async function fileToAvatar(file){
 }
 
 /* ---------- cálculos ---------- */
-// Premios: el 1º se redondea para arriba a la decena; lo que sobra se reparte entre los demás
+// Premios: el 1º se redondea para arriba a los $10.000; lo que sobra se reparte entre los demás
 // en la misma proporción, redondeando para arriba el 2º; el último se lleva el resto (el pozo cierra exacto).
-const REDONDEO=10;
+const REDONDEO=10000;
 function splitPot(pot,split){
   const out=[];let rest=pot,share=split.reduce((a,b)=>a+b,0);
   split.forEach((p,i)=>{
