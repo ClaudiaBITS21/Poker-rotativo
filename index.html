@@ -576,6 +576,10 @@ function tstate(g){
   return {t,dur,el,over:raw-dur,level:t.level||0,brk:!!t.brk,rem:dur-el,running:!!t.running&&!done,done,
     started:(t.acc||0)>0||!!t.running||(t.level||0)>0||!!t.brk};
 }
+// No se puede empezar antes de la fecha y hora programadas (sin hora: desde las 00:00 de ese día).
+function startAt(g){const [y,m,d]=(g.date||'').split('-').map(Number),[hh,mm]=(g.time||'00:00').split(':').map(Number);return new Date(y,m-1,d,hh||0,mm||0).getTime()}
+const tooEarly=(g,ts)=>!ts.started&&Date.now()<startAt(g);
+const startLabel=g=>g.date===today()?`Empieza a las ${g.time||'00:00'}`:`Empieza el ${fmtDate(g.date)}${g.time?' a las '+g.time:''}`;
 const rebuyClosed=ts=>ts.level>REBUY_CUT||ts.brk||(ts.level===REBUY_CUT&&ts.done);
 const canKO=(g,ts)=>g.status!=='closed'&&(g.type==='mie'?ts.started:rebuyClosed(ts));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
@@ -861,7 +865,7 @@ function vTimer(g,ts,big){
   const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
   const locked=ui.sound&&!audioOk();
   const main=ts.done?`<button class="btn gold go" data-act="tgo">▶ ${nextLabel(g,ts)}</button>`
-    :ts.running?`<button class="btn pri" data-act="tpause">Pausa</button>`:`<button class="btn pri" data-act="tplay">${ts.started?'Seguir':'Empezar'}</button>`;
+    :ts.running?`<button class="btn pri" data-act="tpause">Pausa</button>`:tooEarly(g,ts)?`<button class="btn pri" disabled title="Se habilita a la hora del partido">${startLabel(g)}</button>`:`<button class="btn pri" data-act="tplay">${ts.started?'Seguir':'Empezar'}</button>`;
   const ctl=`<div class="tctl ${ts.done?'isdone':''}">
       <button class="btn icon" data-act="tprev" aria-label="Etapa anterior">⏮</button>
       ${main}
@@ -1089,7 +1093,7 @@ let lastKey=null,lastDone=null,lastWarn=false,alarmed=null,lastAudio=null,wake=n
 function tick(fromRender){
   const [gid,g]=ui.tab==='partida'||ui.tab==='inicio'||ui.big?currentGame():[];
   if(!g){lastKey=null;return}
-  const ts=tstate(g),key=gid+':'+ts.level+':'+ts.brk;
+  const ts=tstate(g),key=gid+':'+ts.level+':'+ts.brk+':'+tooEarly(g,ts);
   if(!fromRender){
     // la etapa terminó recién (menos de 10 s): alarma una sola vez por etapa
     if(ts.done&&ts.t.running&&ts.over<10000&&alarmed!==key){alarmed=key;alarm()}
@@ -1176,11 +1180,11 @@ const ACT={
   resultAuto:()=>{const [gid,g]=currentGame();Store.update('games',gid,{resultManual:false,result:resultFrom(g)})},
   rq:d=>{const [gid,g]=currentGame();Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
   rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
-  tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
+  tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();if(tooEarly(g,ts))return;setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
   tpause:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:false,anchor:0,acc:ts.el,level:ts.level,brk:ts.brk})},
   tgo:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=nextStage(g,ts.t);setTimer(gid,{running:true,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
-  tnext:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();const n=nextStage(g,ts.t);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
-  tprev:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=prevStage(g,ts.t);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
+  tnext:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(tooEarly(g,ts))return;if(ts.done)return ACT.tgo();const n=nextStage(g,ts.t);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
+  tprev:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=prevStage(g,ts.t);if(tooEarly(g,ts))return;setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
   trestart:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level,brk:ts.brk})},
   treset:()=>{if(ui.armed!=='treset'){arm('treset');return}ui.armed=null;const [gid]=currentGame();setTimer(gid,{running:false,anchor:0,acc:0,level:0,brk:false})},
   sound:()=>{unlockAudio();if(ui.sound&&!audioOk()){setTimeout(()=>{beep(1);render()},150);return}ui.sound=!ui.sound;try{localStorage.setItem('poker.sound',ui.sound?'1':'0')}catch{}if(ui.sound)setTimeout(()=>beep(1),150);render()},
