@@ -225,6 +225,18 @@ tfoot td{font-weight:700;border-bottom:0}
 .step.s1 .block{height:96px;background:linear-gradient(180deg,#F1D27A,var(--gold) 60%,#B98A22);color:var(--ink)}
 .step.s2 .block{height:70px}.step.s3 .block{height:52px}
 
+.live{gap:12px}
+.livetag{font-family:var(--num);font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--on-felt-mut)}
+.livetag.on{background:#1F8A55;color:#fff}
+.livetag.on::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#9BF2C0;margin-right:6px;vertical-align:1px}
+@media (prefers-reduced-motion:no-preference){.livetag.on::before{animation:pulse 1.2s ease-in-out infinite}}
+.livegrid{display:grid;grid-template-columns:repeat(4,auto);gap:10px 18px;align-items:end;justify-content:start}
+.livegrid .clock{font-size:clamp(44px,13vw,72px)}
+.livegrid .blinds{font-size:clamp(20px,5.6vw,34px);white-space:nowrap}
+@media (max-width:520px){.livegrid{grid-template-columns:1fr 1fr}}
+.liveav{display:flex;flex-wrap:wrap;gap:4px}
+.btn.ghost{background:transparent;color:var(--on-felt);border-color:rgba(214,167,57,.45)}
+.card .btn.go{min-height:48px}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -335,7 +347,7 @@ const EMOS=['🦈','🐟','🃏','🎩','😎','🤠','👑','💎','🍀','🔥
 
 /* ---------- estado ---------- */
 const S={players:{},games:{}};
-const ui={tab:'partida',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
+const ui={tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
   armed:null,editing:null,err:null,loaded:false,avFor:null,avDraft:null,avTab:'chip'};
 try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
 try{ui.me=localStorage.getItem('poker.me')||null}catch{ui.me=null}
@@ -503,7 +515,7 @@ function renderConn(){
 function render(){
   // preserva foco y cursor si alguien escribe mientras llega un cambio
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
-  $('#tabs').innerHTML=[['partida','Partida'],['jugadores','Jugadores'],['stats','Tabla'],['historial','Historial']]
+  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],['stats','Tabla']]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
   $('#me').innerHTML=!ui.loaded?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
@@ -514,7 +526,7 @@ function render(){
     <p>Esta app guarda las partidas en una base compartida, y tu cuenta todavía no tiene permiso para verla. Por eso no ves los jugadores ni las partidas que ya se cargaron.</p>
     <p><b>Qué hacer:</b> pedile a quien te pasó el link que te invite desde el botón <b>Compartir</b> del artefacto, con el mail de tu cuenta de Claude. Como <b>Editor</b> vas a poder anotar asistencia y rebuys; como <b>Lector</b>, solo mirar.</p>
     <p class="small muted">Un link público no alcanza: los datos compartidos solo se ven con una cuenta invitada. Después de que te inviten, recargá esta página.</p></section>`;
-  else h+=({partida:vPartida,jugadores:vJugadores,stats:vStats,historial:vHistorial})[ui.tab]();
+  else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats})[ui.tab]();
   $('#main').innerHTML=h;
   renderBig();
   renderModal();
@@ -792,21 +804,53 @@ function vStats(){
   </section>`;
 }
 
-function vHistorial(){
-  const gs=Object.entries(S.games).sort((a,b)=>b[1].date.localeCompare(a[1].date));
-  return `<section class="card r" data-suit="♦"><h2>Historial</h2>
-    ${gs.length?`<div class="hist">${gs.map(([id,g])=>{const c=calc(g),r=g.result||{};
-      return `<button data-act="openGame" data-id="${id}">${r.p1?avatar(r.p1,40):`<span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>`}
-        <span><b>${fmtDate(g.date)}</b> · ${TYPES[g.type].name} · ${c.playing.length} jugadores${g.status==='closed'?'':' <span class="badge gold">Abierta</span>'}
-        <span class="small muted" style="display:block">${r.p1?'Ganó '+esc(pname(r.p1)):''}${r.p2?' · 2º '+esc(pname(r.p2)):''}${r.p3?' · 3º '+esc(pname(r.p3)):''}</span></span>
-        <span class="num"><b>${money(c.pot)}</b></span></button>`}).join('')}</div>`:`<p class="empty">Sin partidas todavía.</p>`}
+// Partido vigente: el que tiene el reloj andando, si no uno ya empezado, si no el de hoy.
+function vigente(){
+  const open=openGames();
+  return open.find(([,g])=>g.timer?.running)||open.find(([,g])=>tstate(g).started)||open.find(([,g])=>g.date===today())||null;
+}
+function vInicio(){
+  const v=vigente(),open=openGames().filter(([id])=>!v||id!==v[0]);
+  const played=Object.entries(S.games).filter(([,g])=>g.status==='closed').sort((a,b)=>(b[1].date+(b[1].time||'')).localeCompare(a[1].date+(a[1].time||'')));
+  let live;
+  if(v){
+    const [id,g]=v,ts=tstate(g),c=calc(g),t=TYPES[g.type];
+    const cur=currentGame()[0]===id;
+    const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
+    const state=ts.done?'Nivel terminado':ts.running?'En juego':ts.started?'En pausa':'Hoy, todavía no empezó';
+    live=`<section class="card timer live">
+      <div class="row spread"><span class="badge ${g.type}">${t.name}</span><span class="livetag ${ts.running?'on':''}">${state}</span></div>
+      <h2 style="color:var(--on-felt)">${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
+      <div class="livegrid">
+        <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
+        <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
+        <div><div class="label">Jugadores</div><div class="blinds" style="color:var(--on-felt)">${c.playing.length}</div></div>
+        <div><div class="label">Pozo</div><div class="blinds">${money(c.pot)}</div></div>
+      </div>
+      <div class="liveav">${c.playing.slice(0,14).map(pid=>avatar(pid,28)).join('')}${c.playing.length>14?`<span class="small onfelt">+${c.playing.length-14}</span>`:''}</div>
+      <div class="row"><button class="btn gold go" data-act="goGame" data-id="${id}">Ver el partido en juego</button><button class="btn ghost" data-act="goBig" data-id="${id}">Pantalla grande</button></div>
+    </section>`;
+  }else live=`<section class="card" data-suit="♠"><h2>No hay partido en juego</h2>
+      <p class="muted" style="margin:0">${open.length?`El próximo es el ${fmtDate(open[0][1].date)}${open[0][1].time?' a las '+esc(open[0][1].time):''}.`:'No hay partidos programados.'}</p>
+      <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
+  const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><div class="hist">${open.map(([id,g])=>{const c=calc(g);
+      return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
+        <span><b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}</span></span>
+        <span class="small muted">Ver ›</span></button>`}).join('')}</div></section>`:'';
+  const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
+    ${played.length?`<div class="hist">${played.map(([id,g])=>{const c=calc(g),r=g.result||{};
+      return `<button data-act="goGame" data-id="${id}">${r.p1?avatar(r.p1,40):`<span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>`}
+        <span><b>${fmtDate(g.date)}</b> · ${TYPES[g.type].name} · ${c.playing.length} jug.
+        <span class="small muted" style="display:block">${r.p1?'🏆 '+esc(pname(r.p1)):''}${r.p2?' · 2º '+esc(pname(r.p2)):''}${r.p3?' · 3º '+esc(pname(r.p3)):''}</span></span>
+        <span class="num"><b>${money(c.pot)}</b></span></button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
+  return live+next+past;
 }
 
 /* ---------- timer y alarma ---------- */
 let lastKey=null,lastDone=null,lastWarn=false,alarmed=null,lastAudio=null,wake=null;
 function tick(fromRender){
-  const [gid,g]=ui.tab==='partida'||ui.big?currentGame():[];
+  const [gid,g]=ui.tab==='partida'||ui.tab==='inicio'||ui.big?currentGame():[];
   if(!g){lastKey=null;return}
   const ts=tstate(g),key=gid+':'+ts.level+':'+ts.brk;
   if(!fromRender){
@@ -864,6 +908,9 @@ const ACT={
   tab:d=>{ui.tab=d.tab;ui.editing=null;render();scrollTo(0,0)},
   clearErr:()=>{ui.err=null;render()},
   selGame:d=>{ui.gameId=d.id||'__new';render()},
+  goGame:d=>{ui.gameId=d.id;ui.tab='partida';render();scrollTo(0,0)},
+  goBig:d=>{ui.gameId=d.id;if(!ui.big)ACT.big();else render()},
+  selGameTab:d=>{ui.gameId=d.id||'__new';ui.tab='partida';render();scrollTo(0,0)},
   openGame:d=>{ui.gameId=d.id;ui.tab='partida';render();scrollTo(0,0)},
   newType:d=>{ui.newType=d.v;ui.newDate='';render()},
   newGame:async()=>{
