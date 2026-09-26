@@ -329,6 +329,39 @@ tfoot td{font-weight:700;border-bottom:0}
 }
 @media (prefers-reduced-motion:no-preference){.clock.warn{animation:pulse 1s ease-in-out infinite}}
 @keyframes pulse{50%{opacity:.55}}
+
+/* ---- celulares ---- */
+.proj>*{min-width:0}
+@media (max-aspect-ratio:1/1){
+  .proj{grid-template-columns:minmax(0,1fr)}
+  .proj .pplayers{columns:1}
+}
+@media (max-width:440px){
+  .brand{gap:6px}
+  .brand h1{font-size:21px}
+  .pips{display:none}
+  .mesel,.mebtn{max-width:42vw}
+  .tabs button{flex:1;padding:8px 4px 10px;font-size:14px}
+  .card{padding:18px 14px 16px}
+  .prow.mine,.arow.mine{margin-inline:-14px;padding-inline:14px}
+  /* asistencia: el contador de rebuys baja a una segunda línea, así el nombre se lee entero */
+  .arow{grid-template-columns:auto minmax(0,1fr) auto}
+  .arow .aseg{grid-column:3;grid-row:1}
+  .arow .rq,.arow .rbc{grid-column:2;grid-row:2;justify-self:start;margin-bottom:2px}
+  .arow>span:empty{display:none}
+  .prow .row .btn{min-height:34px;padding:5px 10px;font-size:13px}
+  .tgrid{gap:10px}
+  .tgrid>*{min-width:0}
+  .dealer{width:54px;height:54px}
+  .dealer b{font-size:22px}
+  .clock{font-size:clamp(52px,17vw,124px)}
+  .tctl .btn{padding:6px 10px}
+}
+@media (max-width:360px){
+  .brand h1{font-size:19px}
+  .tabs{gap:0}
+  .tabs button{font-size:13px;padding-inline:2px}
+}
 </style>
 
 <header class="rail">
