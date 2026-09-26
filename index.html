@@ -237,6 +237,20 @@ tfoot td{font-weight:700;border-bottom:0}
 .liveav{display:flex;flex-wrap:wrap;gap:4px}
 .btn.ghost{background:transparent;color:var(--on-felt);border-color:rgba(214,167,57,.45)}
 .card .btn.go{min-height:48px}
+.kolist{display:flex;flex-wrap:wrap;gap:6px}
+.kochip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 12px 3px 3px;font-weight:600;font-size:14px;min-height:34px}
+.kochip:hover:not(:disabled){border-color:var(--red)}
+.kochip.armed{background:var(--red);border-color:var(--red);color:#fff}
+.kochip:disabled{opacity:.55;cursor:not-allowed}
+.kos{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.kos li{display:grid;grid-template-columns:36px auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)}
+.kos li:first-child{border-top:0}
+.kos li b{font-family:var(--num);font-size:18px;color:var(--muted);text-align:right}
+.kos li.pod b{color:var(--gold-2)}
+.kos .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn.undo{min-height:28px;padding:0 10px;font-size:12px}
+.proj .pplayers li.ko{opacity:.45}
+.proj .pplayers li.ko .nm{text-decoration:line-through;font-weight:500}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -461,7 +475,12 @@ function calc(g){
     const f=parts[id].st==='come'?foodShare:0;
     return [id,{entry,n,rb,food:f,total:entry+rb+f}];
   }));
-  return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food:foodTotal,perPerson};
+  // eliminaciones: el orden en que caen da el puesto (el primero en caer queda último)
+  const kos=playing.filter(id=>parts[id].ko).sort((a,b)=>parts[a].ko-parts[b].ko);
+  const alive=playing.filter(id=>!parts[id].ko);
+  const place={};kos.forEach((id,i)=>place[id]=playing.length-i);
+  if(alive.length===1&&kos.length)place[alive[0]]=1;
+  return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food:foodTotal,perPerson,kos,alive,place};
 }
 // Etapas: niveles de ciegas y un break después del 10-20. Nada avanza solo:
 // al llegar a 0:00 la etapa queda terminada hasta que alguien arranca la siguiente.
@@ -477,6 +496,9 @@ function tstate(g){
     started:(t.acc||0)>0||!!t.running||(t.level||0)>0||!!t.brk};
 }
 const rebuyClosed=ts=>ts.level>REBUY_CUT||ts.brk||(ts.level===REBUY_CUT&&ts.done);
+const canKO=(g,ts)=>g.status!=='closed'&&(g.type==='mie'?ts.started:rebuyClosed(ts));
+// resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
+function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,TYPES[g.type].pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});return r}
 const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
 function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level)}`}
 function ladder(g,ts){
@@ -605,6 +627,8 @@ function vGame(gid,g){
 
   ${vTimer(g,ts,false)}
 
+  ${c.playing.length?vKO(g,c,ts):''}
+
   <section class="card r" data-suit="♥">
     <div class="row spread"><h2>Asistencia</h2><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span></div>
     <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${g.type==='mie'?'<span><b style="color:var(--red)">R</b> pidió la recompra</span>':'<span><b>− +</b> rebuys</span>'}</div>
@@ -636,6 +660,23 @@ function vGame(gid,g){
   `;
 }
 
+function vKO(g,c,ts){
+  const on=canKO(g,ts),closed=g.status==='closed',n=c.playing.length;
+  const winner=c.alive.length===1&&c.kos.length?c.alive[0]:null;
+  const standing=Object.keys(c.place).sort((a,b)=>c.place[a]-c.place[b]);
+  const chips=c.alive.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>{
+    const armed=ui.armed==='ko-'+id;
+    return `<button class="kochip ${armed?'armed':''}" data-act="ko" data-pid="${id}" ${on&&!winner?'':'disabled'}>${avatar(id,26)}<span>${armed?'¿Afuera? tocá de nuevo':esc(pname(id))}</span></button>`;
+  }).join('');
+  return `<section class="card" data-suit="♠">
+    <div class="row spread"><h2>Eliminaciones</h2><span class="badge gold">Quedan ${c.alive.length} de ${n}</span></div>
+    ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${g.type==='mie'?'cuando arranca el reloj':'cuando se cierra el rebuy (al terminar el 10-20)'}.</p>`
+      :winner?`<div class="donemsg">🏆 Ganó ${esc(pname(winner))}. Revisá el resultado y cerrá la partida.</div>`
+      :`<p class="muted small" style="margin:0">Tocá dos veces a quien queda afuera. El primero en caer queda ${n}º.</p>`}
+    ${winner?'':`<div class="kolist">${chips}</div>`}
+    ${standing.length?`<ol class="kos">${standing.map(id=>`<li class="${c.place[id]<=TYPES[g.type].pts.length?'pod':''}"><b class="num">${c.place[id]}º</b>${avatar(id,26)}<span class="nm">${esc(pname(id))}</span>${c.place[id]===1?'<span class="small muted">ganador</span>':closed?'':`<button class="btn undo" data-act="unko" data-pid="${id}" title="Vuelve a estar en juego">↩ Volver</button>`}</li>`).join('')}</ol>`:''}
+  </section>`;
+}
 function vResult(gid,g,c){
   const t=TYPES[g.type],res=g.result||{},closed=g.status==='closed';
   const keys=['p1','p2','p3'].slice(0,t.pts.length);
@@ -706,7 +747,7 @@ function renderBig(){
   if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Liga de Poker</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
   const ts=tstate(g),t=TYPES[g.type],c=calc(g),vie=g.type==='vie',parts=g.parts||{};
   const {ctl,rb,clk,doneMsg,blindsNow,nextBl}=vTimer(g,ts,true);
-  const players=c.playing.map(id=>({id,name:pname(id),p:parts[id]})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
+  const players=c.playing.map(id=>({id,name:pname(id),p:parts[id],pl:c.place[id]})).sort((a,b)=>(a.pl||0)-(b.pl||0)||a.name.localeCompare(b.name,'es')).sort((a,b)=>(!!a.p.ko)-(!!b.p.ko));
   const tag=x=>vie
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
@@ -720,10 +761,10 @@ function renderBig(){
       ${rb}
     </div>
     <aside class="pside">
-      <div><div class="plab">Pozo · ${c.playing.length} jugadores · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
+      <div><div class="plab">Pozo · ${c.kos.length?`quedan ${c.alive.length} de ${c.playing.length}`:c.playing.length+' jugadores'} · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
       <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
       <div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>
-      <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${tag(x)}</li>`).join('')||'<li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
+      <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>x.p.ko?`<li class="ko">${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span><span class="ptag free">${x.pl}º</span></li>`:`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tag(x)}</li>`).join('')||'<li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
     </aside>
     <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
     ${ctl}
@@ -824,7 +865,7 @@ function vInicio(){
       <div class="livegrid">
         <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
         <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
-        <div><div class="label">Jugadores</div><div class="blinds" style="color:var(--on-felt)">${c.playing.length}</div></div>
+        <div><div class="label">${c.kos.length?'Quedan':'Jugadores'}</div><div class="blinds" style="color:var(--on-felt)">${c.kos.length?c.alive.length+'/'+c.playing.length:c.playing.length}</div></div>
         <div><div class="label">Pozo</div><div class="blinds">${money(c.pot)}</div></div>
       </div>
       <div class="liveav">${c.playing.slice(0,14).map(pid=>avatar(pid,28)).join('')}${c.playing.length>14?`<span class="small onfelt">+${c.playing.length-14}</span>`:''}</div>
@@ -929,6 +970,13 @@ const ACT={
     ui.gameId=first;ui.newDate='';ui.newReps=1;render();
   },
   st:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
+  ko:d=>{
+    if(ui.armed!=='ko-'+d.pid){arm('ko-'+d.pid);return}ui.armed=null;
+    const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=Date.now();
+    Store.update('games',gid,{parts:{[d.pid]:{ko:g2.parts[d.pid].ko}},result:resultFrom(g2)});
+  },
+  unko:d=>{const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=0;
+    Store.update('games',gid,{parts:{[d.pid]:{ko:0}},result:resultFrom(g2)})},
   rq:d=>{const [gid,g]=currentGame();Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
   rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
   tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
@@ -986,7 +1034,7 @@ const CHG={
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(!b){return}
-  if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)){ui.armed=null}
+  if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)&&!(b.dataset.act==='ko'&&ui.armed==='ko-'+b.dataset.pid)){ui.armed=null}
   ACT[b.dataset.act]?.(b.dataset,b,e);
 });
 document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el)CHG[el.dataset.chg](el)});

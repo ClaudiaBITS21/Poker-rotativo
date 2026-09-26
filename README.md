@@ -21,6 +21,9 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 - **Avatares**: cada jugador elige ficha de color (con sus iniciales), carta, emoji o foto propia
   (se recorta y achica a 160 px y se guarda en su documento). "¿Quién sos?" arriba a la derecha
   recuerda en ese dispositivo quién es y pone su fila primero.
+- **Eliminaciones**: se va marcando quién queda afuera (dos toques) y eso da el puesto final de cada
+  uno; con uno solo en pie se completa el podio. En rápido se habilita al arrancar el reloj, en con
+  rebuy cuando se cierra el rebuy. "Volver" deshace una eliminación.
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
 
