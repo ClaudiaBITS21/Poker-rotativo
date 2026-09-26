@@ -251,6 +251,12 @@ tfoot td{font-weight:700;border-bottom:0}
 .btn.undo{min-height:28px;padding:0 10px;font-size:12px}
 .proj .pplayers li.ko{opacity:.45}
 .proj .pplayers li.ko .nm{text-decoration:line-through;font-weight:500}
+.mesas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.mesa{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mesa ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.mesa li{display:flex;align-items:center;gap:8px;min-width:0}
+.mesa li .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mesa li.out .nm{color:var(--muted);text-decoration:line-through;font-weight:500}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -676,6 +682,8 @@ function vGame(gid,g){
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
   </section>
 
+  ${vMesas(g,c)}
+
   <section class="card r" data-suit="♦">
     <h2>Cuentas</h2>
     <div class="fields">
@@ -701,6 +709,40 @@ function vGame(gid,g){
   `;
 }
 
+// Mesas: hasta MESA_MAX jugadores, una mesa; con más, dos mesas mitad y mitad.
+// Se eligen antes los dos que reparten; el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.
+const MESA_MAX=11;
+const tablesOf=g=>[g.tables?.m1||[],g.tables?.m2||[]].filter(t=>t.length);
+function rnd(n){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+function drawTables(playing,dealers){
+  if(playing.length<=MESA_MAX) return [shuffle(playing)];
+  const [d1,d2]=shuffle(dealers),rest=shuffle(playing.filter(id=>!dealers.includes(id)));
+  const small=Math.floor(playing.length/2),sizeA=playing.length%2&&rnd(2)?small+1:small;
+  const a=[d1,...rest.slice(0,sizeA-1)],b=[d2,...rest.slice(sizeA-1)];
+  return [a,b];
+}
+function vMesas(g,c){
+  const n=c.playing.length;if(n<2)return '';
+  const two=n>MESA_MAX,closed=g.status==='closed',dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
+  const tables=tablesOf(g).map(t=>t.filter(id=>c.playing.includes(id))).filter(t=>t.length);
+  const seated=new Set(tables.flat()),missing=c.playing.filter(id=>!seated.has(id));
+  const stale=tables.length&&(missing.length||tables.length!==(two?2:1));
+  const ready=!two||(dl.length===2&&dl[0]!==dl[1]);
+  const sel=i=>`<label><span class="label">Repartidor ${i+1}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
+    ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl[1-i]===id?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
+  const armed=ui.armed==='mesas';
+  const list=(t,i)=>`<div class="mesa"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${t.length} jugadores</span></h3><ol>${t.map(id=>`<li class="${c.kos.includes(id)?'out':''}">${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${dl.includes(id)?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`;
+  return `<section class="card" data-suit="♠">
+    <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${two?'2 mesas':'1 mesa'}</span></div>
+    <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad. Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El sorteo define el orden en la mesa.`}</p>
+    ${two?`<div class="fields">${sel(0)}${sel(1)}</div>`:''}
+    ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas" ${ready?'':'disabled'}>${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button>
+      ${ready?'':'<span class="small muted">Elegí a los dos que reparten para sortear.</span>'}</div>`}
+    ${stale?`<div class="err">Cambió la asistencia desde el sorteo${missing.length?': '+missing.map(pname).map(esc).join(', ')+' sin mesa':''}. Volvé a sortear.</div>`:''}
+    ${tables.length?`<div class="mesas">${tables.map(list).join('')}</div>`:''}
+  </section>`;
+}
 function vKO(g,c,ts){
   const on=canKO(g,ts),closed=g.status==='closed',n=c.playing.length;
   const winner=c.alive.length===1&&c.kos.length?c.alive[0]:null;
@@ -1061,6 +1103,12 @@ const ACT={
   toggleActive:d=>{const p=S.players[d.pid];Store.update('players',d.pid,{active:p.active===false})},
   delPlayer:d=>{if(ui.armed!=='delP-'+d.pid){arm('delP-'+d.pid);return}ui.armed=null;if(ui.me===d.pid)ACT.clearMe();Store.del('players',d.pid)},
   foodMode:d=>{const [gid]=currentGame();Store.update('games',gid,{foodMode:d.v})},
+  mesas:()=>{
+    const [gid,g]=currentGame();
+    if(tablesOf(g).length&&ui.armed!=='mesas'){arm('mesas');return}ui.armed=null;
+    const c=calc(g),dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
+    const [m1,m2=[]]=drawTables(c.playing,dl);Store.update('games',gid,{tables:{m1,m2}});
+  },
   statsType:d=>{ui.statsType=d.v;render()},
   statsMode:d=>{ui.statsMode=d.v;render()},
   // avatar
@@ -1090,6 +1138,7 @@ const CHG={
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
+  dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,2);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[d[0]||'',d[1]||'']})},
   pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value},resultManual:true})},
   me:el=>{ui.me=el.value||null;try{ui.me?localStorage.setItem('poker.me',ui.me):localStorage.removeItem('poker.me')}catch{}render()},
   photo:async el=>{
