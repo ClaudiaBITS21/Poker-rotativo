@@ -168,9 +168,6 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (max-width:360px){.aseg button{width:29px}.arow .av{width:26px!important;height:26px!important}}
 .chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500}
 .chk input{width:20px;height:20px;accent-color:var(--red)}
-.tally{display:inline-flex;align-items:center;gap:8px}
-.tally .btn{min-height:32px;padding:2px 12px;border-radius:999px}
-.tally svg{display:block}
 @media (max-width:600px){.prow{grid-template-columns:1fr}.seg{width:100%}.seg button{flex:1;padding-inline:6px}.extra{padding-left:0}}
 
 /* ---- timer: mesa oscura ---- */
@@ -278,7 +275,6 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .pplayers li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .proj .pplayers .av{width:1.8em;height:1.8em}
 .proj .pplayers .av.cardav{width:1.3em}
-.proj .pplayers svg.tl{height:1.05em;width:auto;flex:none}
 .proj .ptag{font-family:var(--num);font-weight:500;font-size:.85em;letter-spacing:.04em;padding:0 .45em;border-radius:999px;white-space:nowrap;display:inline-flex;align-items:center;gap:.3em}
 .proj .ptag.used{background:var(--red);color:#fff}
 .proj .ptag.free{color:var(--pmut);border:1px solid var(--pline)}
@@ -649,7 +645,7 @@ function renderBig(){
   const {ctl,rb,mm,ss}=vTimer(g,ts,true);
   const players=c.playing.map(id=>({id,name:pname(id),p:parts[id]})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   const tag=x=>vie
-    ?(x.p.rb?`<span class="ptag">${tallySvg(x.p.rb,'tl')}<span class="num">${x.p.rb}</span></span>`:`<span class="ptag free">—</span>`)
+    ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   const lad=BLINDS.map((b,i)=>`<span class="${i<ts.level?'past':i===ts.level?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`).join('');
   w.innerHTML=`<div class="proj" role="dialog" aria-label="Pantalla de juego">
@@ -678,18 +674,6 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight')ACT.tnext();
   else if(e.key==='ArrowLeft')ACT.tprev();
 });
-
-function tallySvg(n,cls=''){
-  if(!n) return '';
-  const groups=Math.ceil(n/5),W=groups*26;
-  let p='';
-  for(let gi=0;gi<groups;gi++){
-    const k=Math.min(5,n-gi*5),x=gi*26+3,y=3,s=18;
-    const seg=[[x,y,x,y+s],[x,y,x+s,y],[x+s,y,x+s,y+s],[x,y+s,x+s,y+s],[x,y+s,x+s,y]];
-    for(let i=0;i<k;i++){const [a,b,c,d]=seg[i];p+=`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}"/>`}
-  }
-  return `<svg class="${cls}" width="${W}" height="24" viewBox="0 0 ${W} 24" stroke="#E3504F" stroke-width="2.4" stroke-linecap="round" fill="none" aria-hidden="true">${p}</svg>`;
-}
 
 /* ---------- selector de avatar ---------- */
 function renderModal(){
