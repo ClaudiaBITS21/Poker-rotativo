@@ -979,7 +979,7 @@ function vStats(){
     <h2>Tabla</h2>
     <div class="gamepick">${tabs}</div>
     <div class="gamepick">${modes}</div>
-    ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg)+' pts/PJ':r.pts+' pts',sub:r.pj+' PJ'}))):''}
+    ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
     <p class="small muted">${st.games} partidas cerradas. ${note}</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
