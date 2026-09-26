@@ -121,13 +121,13 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 
 /* ---- resumen con fichas ---- */
 .head{display:flex;flex-direction:column;gap:14px}
-.stack{display:grid;grid-template-columns:repeat(3,auto) 1fr;gap:14px;align-items:center}
+.stack{display:grid;grid-template-columns:repeat(4,auto) 1fr;gap:14px;align-items:center}
 .pchip{display:flex;flex-direction:column;align-items:center;gap:4px}
 .pchip .av{width:58px;height:58px}
 .plaque{justify-self:end;text-align:right;background:linear-gradient(180deg,#F1D27A,var(--gold) 55%,#B98A22);color:var(--ink);border-radius:12px;padding:8px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 2px 6px rgba(0,0,0,.2)}
 .plaque .label{color:rgba(27,23,19,.7)}
 .plaque b{display:block;font-family:var(--num);font-weight:600;font-size:30px;line-height:1.05}
-@media (max-width:480px){.stack{grid-template-columns:repeat(3,1fr)}.plaque{grid-column:1/-1;justify-self:stretch;text-align:center}}
+@media (max-width:480px){.stack{grid-template-columns:repeat(4,1fr);gap:8px}.pchip .av{width:50px;height:50px}.plaque{grid-column:1/-1;justify-self:stretch;text-align:center}}
 
 /* ---- asistencia ---- */
 .plist{display:flex;flex-direction:column}
@@ -230,7 +230,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .livetag.on{background:#1F8A55;color:#fff}
 .livetag.on::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#9BF2C0;margin-right:6px;vertical-align:1px}
 @media (prefers-reduced-motion:no-preference){.livetag.on::before{animation:pulse 1.2s ease-in-out infinite}}
-.livegrid{display:grid;grid-template-columns:repeat(4,auto);gap:10px 18px;align-items:end;justify-content:start}
+.livegrid{display:grid;grid-template-columns:repeat(5,auto);gap:10px 18px;align-items:end;justify-content:start}
 .livegrid .clock{font-size:clamp(44px,13vw,72px)}
 .livegrid .blinds{font-size:clamp(20px,5.6vw,34px);white-space:nowrap}
 @media (max-width:520px){.livegrid{grid-template-columns:1fr 1fr}}
@@ -302,6 +302,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .rebuyst{font-size:clamp(15px,1.7vw,30px);padding:.5vw 1.1vw;background:rgba(0,0,0,.28)}
 .proj .rebuyst.closed{background:var(--red);color:#fff}
 .proj .pside{display:flex;flex-direction:column;gap:1.1vw;min-height:0;background:rgba(0,0,0,.25);border:1px solid rgba(214,167,57,.25);border-radius:1.6vw;padding:1.6vw 1.8vw}
+.proj .pcount{font-family:var(--num);font-weight:500;font-size:clamp(18px,2.2vw,40px);color:var(--pmut)}
+.proj .pcount b{color:var(--pfg);font-weight:600}
 .proj .ppot{font-family:var(--num);font-weight:600;font-size:clamp(34px,4.8vw,94px);line-height:.95;color:var(--gold)}
 .proj .pprz{display:flex;flex-direction:column;gap:.3vw;font-family:var(--num);font-size:clamp(16px,1.9vw,34px)}
 .proj .pprz div{display:flex;justify-content:space-between;gap:1vw;border-bottom:1px solid var(--pline);padding-bottom:.2vw}
@@ -656,7 +658,8 @@ function vGame(gid,g){
     <h2>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
     <div class="row"><input type="date" id="g-date" data-chg="date" value="${esc(g.date)}" ${closed?'disabled':''} aria-label="Fecha"><input type="time" id="g-time" data-chg="time" value="${esc(g.time||'')}" ${closed?'disabled':''} aria-label="Hora"></div>
     <div class="stack">
-      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[2],String(c.playing.length))}</span>`}<span class="label">Juegan</span></div>
+      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[2],String(c.playing.length))}</span>`}<span class="label">Entraron</span></div>
+      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[3],String(c.alive.length))}</span>`}<span class="label">Quedan</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[9],String(c.eaters.length))}</span>`}<span class="label">Comen</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[0],String(c.rebuys))}</span>`}<span class="label">${g.type==='vie'?'Rebuys':'Recompras'}</span></div>
       <div class="plaque"><span class="label">Pozo</span><b class="num">${money(c.pot)}</b></div>
@@ -801,7 +804,8 @@ function renderBig(){
       ${rb}
     </div>
     <aside class="pside">
-      <div><div class="plab">Pozo · ${c.kos.length?`quedan ${c.alive.length} de ${c.playing.length}`:c.playing.length+' jugadores'} · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
+      <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
+      <div><div class="plab">Pozo · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
       <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
       <div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>
       <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>x.p.ko?`<li class="ko">${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span><span class="ptag free">${x.pl}º</span></li>`:`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tag(x)}</li>`).join('')||'<li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
@@ -925,7 +929,8 @@ function vInicio(){
       <div class="livegrid">
         <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
         <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
-        <div><div class="label">${c.kos.length?'Quedan':'Jugadores'}</div><div class="blinds" style="color:var(--on-felt)">${c.kos.length?c.alive.length+'/'+c.playing.length:c.playing.length}</div></div>
+        <div><div class="label">Entraron</div><div class="blinds" style="color:var(--on-felt)">${c.playing.length}</div></div>
+        <div><div class="label">Quedan</div><div class="blinds" style="color:var(--on-felt)">${c.alive.length}</div></div>
         <div><div class="label">Pozo</div><div class="blinds">${money(c.pot)}</div></div>
       </div>
       <div class="liveav">${c.playing.slice(0,14).map(pid=>avatar(pid,28)).join('')}${c.playing.length>14?`<span class="small onfelt">+${c.playing.length-14}</span>`:''}</div>
