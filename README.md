@@ -29,6 +29,7 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 - Terminar en cualquier momento: botón "Terminar partida ↓" arriba; se eligen los ganadores (también entre quienes no se anotaron, que quedan como que jugaron) y se cierra aunque falten puestos, con confirmación.
 - Mesas: hasta 11 jugadores, una mesa; con 12 o más, dos mesas mitad y mitad. Se eligen los dos repartidores y "Sortear mesas" manda a cada uno a una mesa distinta y reparte al resto al azar (si son impares, la mesa 1 lleva uno más). En cada mesa el asiento 1 es el que reparte y del 2 en adelante se sortea.
 - Resultado: se completa solo con las eliminaciones, pero se puede elegir 1º/2º/3º a mano en cualquier momento; desde ahí las eliminaciones no lo pisan (botón "Usar las eliminaciones" para volver).
+- Cebolla 🧅: el primero que queda sin puntos (3º en Rápido, 4º en Con rebuy). Sale de las eliminaciones o se elige a mano en Resultado; la Tabla cuenta cuántas veces fue cebolla cada uno y muestra "el más cebolla".
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
   En "Todos" se suman los puntos y partidas ganadas (1º) de la liga anterior (campo `prev` de cada jugador).

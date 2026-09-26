@@ -272,6 +272,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .played .pods{display:flex;flex-wrap:wrap;gap:4px 12px}
 .played .pod{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:600;min-width:0}
 .played .pod .nm{white-space:nowrap}
+.ceb{display:flex;align-items:center;gap:8px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:12px;padding:8px 12px;font-size:15px}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -563,7 +564,9 @@ function tstate(g){
 const rebuyClosed=ts=>ts.level>REBUY_CUT||ts.brk||(ts.level===REBUY_CUT&&ts.done);
 const canKO=(g,ts)=>g.status!=='closed'&&(g.type==='mie'?ts.started:rebuyClosed(ts));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
-function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,TYPES[g.type].pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});return r}
+// "Cebolla": el primero que queda afuera de los puntos (3º en Rápido, 4º en Con rebuy)
+const cebPlace=type=>TYPES[type].pts.length+1;
+function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,TYPES[g.type].pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});r.ceb=Object.keys(c.place).find(id=>c.place[id]===cebPlace(g.type))||'';return r}
 const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
 function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level)}`}
 function ladder(g,ts){
@@ -578,7 +581,7 @@ function ladder(g,ts){
 function stats(type,noPrev){
   const games=Object.values(S.games).filter(g=>g.status==='closed'&&(type==='all'||g.type===type));
   const out={};
-  for(const [id,p] of Object.entries(S.players)) out[id]={id,name:p.name,since:p.since||'',active:p.active!==false,pj:0,eligible:0,p1:0,p2:0,p3:0,pts:0,rb:0,won:0,ate:0};
+  for(const [id,p] of Object.entries(S.players)) out[id]={id,name:p.name,since:p.since||'',active:p.active!==false,ceb:0,pj:0,eligible:0,p1:0,p2:0,p3:0,pts:0,rb:0,won:0,ate:0};
   for(const g of games){
     const c=calc(g),t=TYPES[g.type],res=g.result||{};
     for(const o of Object.values(out)) if(!o.since||g.date>=o.since) o.eligible++;
@@ -588,6 +591,7 @@ function stats(type,noPrev){
       if(g.type==='vie')o.rb+=g.parts[id].rb||0;else if(g.parts[id].rq)o.rb++;
       if(g.parts[id].st==='come')o.ate++;
     }
+    if(res.ceb&&out[res.ceb])out[res.ceb].ceb++;
     ['p1','p2','p3'].forEach((k,i)=>{const id=res[k];if(id&&out[id]&&t.pts[i]!=null){out[id][k]++;out[id].pts+=t.pts[i];out[id].won+=c.prizes[i]||0;}});
   }
   // Puntos y partidas ganadas de la liga anterior (solo cuentan en "Todos")
@@ -787,8 +791,9 @@ function vResult(gid,g,c){
   const t=TYPES[g.type],res=g.result||{},closed=g.status==='closed';
   const keys=['p1','p2','p3'].slice(0,t.pts.length);
   const others=sortedPlayers().filter(([id,p])=>p.active!==false&&!c.playing.includes(id)).map(([id])=>id);
-  const opts=(ids,k)=>ids.map(id=>`<option value="${id}" ${res[k]===id?'selected':''} ${keys.some(o=>o!==k&&res[o]===id)?'disabled':''}>${esc(pname(id))}</option>`).join('');
-  const sel=(k,i)=>`<label><span class="label">${i+1}º puesto · ${t.pts[i]} pts · ${money(c.prizes[i])}</span>
+  const all=[...keys,'ceb'];
+  const opts=(ids,k)=>ids.map(id=>`<option value="${id}" ${res[k]===id?'selected':''} ${all.some(o=>o!==k&&res[o]===id)?'disabled':''}>${esc(pname(id))}</option>`).join('');
+  const sel=(k,i)=>`<label><span class="label">${k==='ceb'?`🧅 Cebolla · ${cebPlace(g.type)}º, sin puntos`:`${i+1}º puesto · ${t.pts[i]} pts · ${money(c.prizes[i])}`}</span>
     <select id="res-${k}" data-chg="pos" data-k="${k}" ${closed?'disabled':''}><option value="">—</option>
     ${opts(c.playing,k)}${others.length?`<optgroup label="No anotados en la asistencia">${opts(others,k)}</optgroup>`:''}</select></label>`;
   const need=Math.min(keys.length,Math.max(c.playing.length,1));
@@ -799,7 +804,7 @@ function vResult(gid,g,c){
   return `<section class="card" data-suit="♣">
     <h2>Resultado</h2>
     ${shown.length?podium(keys.map((k,i)=>res[k]?{id:res[k],top:`${i+1}º`,val:money(c.prizes[i]),sub:t.pts[i]+' pts'}:null)):''}
-    <div class="fields">${keys.map(sel).join('')}</div>
+    <div class="fields">${keys.map(sel).join('')}${sel('ceb')}</div>
     <div class="row">
       ${closed?`<button class="btn" data-act="reopen">Reabrir partida</button>`:`<button class="btn gold ${armedClose?'armed':''}" data-act="closeGame" ${some?'':'disabled'}>${armedClose?'Faltan puestos: ¿cerrar igual? Tocá de nuevo':'Cerrar partida y sumar puntos'}</button>`}
       <button class="btn danger ${armedDel?'armed':''}" data-act="delGame">${armedDel?'¿Seguro? Tocá de nuevo para borrar':'Borrar partida'}</button>
@@ -959,14 +964,14 @@ function vStats(){
       .sort((a,b)=>b.avg-a.avg||b.pj-a.pj||a.name.localeCompare(b.name,'es'));
     top=rows.filter(r=>r.avg>0).slice(0,3);
     note=`Cada número está dividido por las partidas que jugó esa persona, así se compara a quien va siempre con quien va poco. No incluye la liga anterior, que no tiene partidas cargadas.`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
-    row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r" title="Cebolla: primero sin puntos">🧅</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
+    row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${pctOf(r.ceb,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
   }else{
     rows=st.rows.filter(r=>r.pj||r.active);
     top=rows.filter(r=>r.pts>0).slice(0,3);
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
-    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r" title="Cebolla: primero sin puntos">🧅</th><th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
+    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.ceb||''}</td><td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
   }
   const split=!per&&ui.statsType==='all';
   if(split){
@@ -982,7 +987,9 @@ function vStats(){
     <div class="gamepick">${tabs}</div>
     <div class="gamepick">${modes}</div>
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
-    <p class="small muted">${st.games} partidas cerradas. ${note}</p>
+    ${(()=>{const cb=st.rows.filter(r=>r.ceb).sort((a,b)=>b.ceb-a.ceb||a.name.localeCompare(b.name,'es'));if(!cb.length)return '';const mx=cb[0].ceb,kings=cb.filter(r=>r.ceb===mx);
+      return `<div class="ceb">🧅 <span>El más cebolla: <b>${kings.map(r=>esc(r.name)).join(', ')}</b> · ${mx} ${mx===1?'vez':'veces'}</span></div>`})()}
+    <p class="small muted">${st.games} partidas cerradas. ${note} 🧅 = cebolla, el primero que queda sin puntos (3º en Rápido, 4º en Con rebuy).</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
       <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}<span>${esc(r.name)}${ptag(r.id)}</span></span></td>${row(r)}</tr>`).join('')}</tbody>
@@ -1032,7 +1039,7 @@ function vInicio(){
   const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
-      const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('');
+      const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('')+(r.ceb&&r.p1?`<span class="pod" style="color:var(--muted)">🧅 <span class="nm">${esc(pname(r.ceb))}</span></span>`:'');
       return `<button data-act="goGame" data-id="${id}">
         <span class="phd"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span><b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
@@ -1147,7 +1154,7 @@ const ACT={
     const c=calc(g),need=Math.min(keys.length,Math.max(c.playing.length,1));
     if(!keys.slice(0,need).every(k=>res[k])&&ui.armed!=='closeGame'){arm('closeGame');return}ui.armed=null;
     // los ganadores cuentan como que jugaron aunque no se haya cargado la asistencia
-    const parts={};keys.forEach(k=>{const id=res[k];if(id&&!c.playing.includes(id))parts[id]={st:'juega'}});
+    const parts={};[...keys,'ceb'].forEach(k=>{const id=res[k];if(id&&!c.playing.includes(id))parts[id]={st:'juega'}});
     Store.update('games',gid,{status:'closed',closedAt:Date.now(),timer:{running:false},...(Object.keys(parts).length?{parts}:{})});
   },
   goResult:()=>{const el=document.getElementById('res-p1');if(el){el.closest('section').scrollIntoView({behavior:'smooth',block:'start'})}},
