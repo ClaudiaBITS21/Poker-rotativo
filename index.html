@@ -445,6 +445,9 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const money=n=>'$ '+Math.round(n||0).toLocaleString('es-AR');
+// campos de plata: se escriben y se ven como "$ 20.000"; se guardan como número
+const digits=v=>String(v??'').replace(/\D/g,'');
+const moneyIn=v=>{const d=digits(v);return d===''?'':money(+d)};
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>ymd(new Date());
 const fmtDate=s=>{if(!s)return '';const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})};
@@ -673,11 +676,11 @@ function vGame(gid,g){
   <section class="card r" data-suit="♦">
     <h2>Cuentas</h2>
     <div class="fields">
-      <label><span class="label">Entrada ($)</span><input type="number" min="0" step="100" id="g-entry" data-chg="num" data-k="entry" value="${g.entry??''}" ${closed?'disabled':''}></label>
-      <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} ($)</span><input type="number" min="0" step="100" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${g.rebuyPrice??''}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
-      <label><span class="label">Comida ($) <span class="fmode">${[['total','Total'],['pp','Por persona']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${(g.foodMode||'total')===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></span>${c.perPerson
-        ?`<input type="number" min="0" step="100" id="g-foodpp" data-chg="num" data-k="foodPP" value="${g.foodPP??''}" placeholder="Por persona" ${closed?'disabled':''}>`
-        :`<input type="number" min="0" step="100" id="g-food" data-chg="num" data-k="food" value="${g.food??''}" placeholder="Total de la comida" ${closed?'disabled':''}>`}</label>
+      <label><span class="label">Entrada</span><input type="text" inputmode="numeric" class="money" id="g-entry" data-chg="num" data-k="entry" value="${moneyIn(g.entry)}" ${closed?'disabled':''}></label>
+      <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} </span><input type="text" inputmode="numeric" class="money" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${moneyIn(g.rebuyPrice)}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
+      <label><span class="label">Comida <span class="fmode">${[['total','Total'],['pp','Por persona']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${(g.foodMode||'total')===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></span>${c.perPerson
+        ?`<input type="text" inputmode="numeric" class="money" id="g-foodpp" data-chg="num" data-k="foodPP" value="${moneyIn(g.foodPP)}" placeholder="Por persona" ${closed?'disabled':''}>`
+        :`<input type="text" inputmode="numeric" class="money" id="g-food" data-chg="num" data-k="food" value="${moneyIn(g.food)}" placeholder="Total de la comida" ${closed?'disabled':''}>`}</label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
       <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
@@ -1058,7 +1061,7 @@ let armT=null;
 function arm(k){ui.armed=k;render();clearTimeout(armT);armT=setTimeout(()=>{ui.armed=null;render()},4000)}
 const CHG={
   rq:el=>{const [gid]=currentGame();Store.update('games',gid,{parts:{[el.dataset.pid]:{rq:el.checked}}})},
-  num:el=>{const [gid]=currentGame();const v=el.value===''?'':Math.max(0,+el.value);Store.update('games',gid,{[el.dataset.k]:v})},
+  num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v})},
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
@@ -1076,6 +1079,8 @@ document.addEventListener('click',e=>{
   if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)&&!(b.dataset.act==='ko'&&ui.armed==='ko-'+b.dataset.pid)){ui.armed=null}
   ACT[b.dataset.act]?.(b.dataset,b,e);
 });
+// formatea la plata mientras se escribe, con el cursor siempre al final
+document.addEventListener('input',e=>{const el=e.target;if(!el.classList||!el.classList.contains('money'))return;el.value=moneyIn(el.value)});
 document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el)CHG[el.dataset.chg](el)});
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
