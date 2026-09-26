@@ -24,6 +24,7 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 - **Eliminaciones**: se va marcando quién queda afuera (dos toques) y eso da el puesto final de cada
   uno; con uno solo en pie se completa el podio. En rápido se habilita al arrancar el reloj, en con
   rebuy cuando se cierra el rebuy. "Volver" deshace una eliminación.
+- Resultado: se completa solo con las eliminaciones, pero se puede elegir 1º/2º/3º a mano en cualquier momento; desde ahí las eliminaciones no lo pisan (botón "Usar las eliminaciones" para volver).
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
   En "Todos" se suman los puntos y partidas ganadas (1º) de la liga anterior (campo `prev` de cada jugador).

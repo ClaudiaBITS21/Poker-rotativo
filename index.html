@@ -730,6 +730,8 @@ function vResult(gid,g,c){
       ${closed?`<button class="btn" data-act="reopen">Reabrir partida</button>`:`<button class="btn gold" data-act="closeGame" ${ok&&c.playing.length?'':'disabled'}>Cerrar partida y sumar puntos</button>`}
       <button class="btn danger ${armedDel?'armed':''}" data-act="delGame">${armedDel?'¿Seguro? Tocá de nuevo para borrar':'Borrar partida'}</button>
     </div>
+    ${closed?'':g.resultManual?`<div class="row"><span class="small muted" style="flex:1;min-width:180px">Resultado cargado a mano: las eliminaciones no lo cambian.</span><button class="btn" data-act="resultAuto">Usar las eliminaciones</button></div>`
+      :`<span class="small muted">Se completa solo con las eliminaciones. Si elegís un puesto a mano, manda lo que elijas.</span>`}
     ${!closed&&!ok?`<span class="small muted">Elegí ${need===3?'los tres primeros puestos':need===2?'1º y 2º':'al ganador'} para cerrar. La asistencia queda registrada al cerrar.</span>`:''}
   </section>`;
 }
@@ -1009,10 +1011,11 @@ const ACT={
   ko:d=>{
     if(ui.armed!=='ko-'+d.pid){arm('ko-'+d.pid);return}ui.armed=null;
     const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=Date.now();
-    Store.update('games',gid,{parts:{[d.pid]:{ko:g2.parts[d.pid].ko}},result:resultFrom(g2)});
+    Store.update('games',gid,{parts:{[d.pid]:{ko:g2.parts[d.pid].ko}},...(g.resultManual?{}:{result:resultFrom(g2)})});
   },
   unko:d=>{const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=0;
-    Store.update('games',gid,{parts:{[d.pid]:{ko:0}},result:resultFrom(g2)})},
+    Store.update('games',gid,{parts:{[d.pid]:{ko:0}},...(g.resultManual?{}:{result:resultFrom(g2)})})},
+  resultAuto:()=>{const [gid,g]=currentGame();Store.update('games',gid,{resultManual:false,result:resultFrom(g)})},
   rq:d=>{const [gid,g]=currentGame();Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
   rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
   tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
@@ -1059,7 +1062,7 @@ const CHG={
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
-  pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value}})},
+  pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value},resultManual:true})},
   me:el=>{ui.me=el.value||null;try{ui.me?localStorage.setItem('poker.me',ui.me):localStorage.removeItem('poker.me')}catch{}render()},
   photo:async el=>{
     const f=el.files&&el.files[0];if(!f)return;
