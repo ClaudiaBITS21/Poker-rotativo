@@ -24,11 +24,12 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 - **Eliminaciones**: se va marcando quién queda afuera (dos toques) y eso da el puesto final de cada
   uno; con uno solo en pie se completa el podio. En rápido se habilita al arrancar el reloj, en con
   rebuy cuando se cierra el rebuy. "Volver" deshace una eliminación.
-- Mesas: hasta 11 jugadores, una mesa; con 12 o más, dos mesas mitad y mitad. Se eligen los dos repartidores y "Sortear mesas" manda a cada uno a una mesa distinta y reparte al resto al azar (si son impares, también se sortea qué mesa tiene uno más).
+- Mesas: hasta 11 jugadores, una mesa; con 12 o más, dos mesas mitad y mitad. Se eligen los dos repartidores y "Sortear mesas" manda a cada uno a una mesa distinta y reparte al resto al azar (si son impares, la mesa 1 lleva uno más).
 - Resultado: se completa solo con las eliminaciones, pero se puede elegir 1º/2º/3º a mano en cualquier momento; desde ahí las eliminaciones no lo pisan (botón "Usar las eliminaciones" para volver).
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
   En "Todos" se suman los puntos y partidas ganadas (1º) de la liga anterior (campo `prev` de cada jugador).
+  En "Todos" > Total, columnas Mié y Vie con los puntos de cada tipo de partida como referencia.
   Vista "Por partido jugado": puntos, % de victorias, % de podios, rebuys y plata ganada divididos por las partidas que jugó cada uno (sin la liga anterior).
 
 Datos en la base del artefacto: `players/<id>` y `games/<id>`. Si se abre fuera de claude.ai,

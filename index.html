@@ -718,7 +718,7 @@ function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=
 function drawTables(playing,dealers){
   if(playing.length<=MESA_MAX) return [shuffle(playing)];
   const [d1,d2]=shuffle(dealers),rest=shuffle(playing.filter(id=>!dealers.includes(id)));
-  const small=Math.floor(playing.length/2),sizeA=playing.length%2&&rnd(2)?small+1:small;
+  const sizeA=Math.ceil(playing.length/2); // si son impares, la mesa 1 lleva uno más
   const a=[d1,...rest.slice(0,sizeA-1)],b=[d2,...rest.slice(sizeA-1)];
   return [a,b];
 }
@@ -735,7 +735,7 @@ function vMesas(g,c){
   const list=(t,i)=>`<div class="mesa"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${t.length} jugadores</span></h3><ol>${t.map(id=>`<li class="${c.kos.includes(id)?'out':''}">${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${dl.includes(id)?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`;
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${two?'2 mesas':'1 mesa'}</span></div>
-    <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad. Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El sorteo define el orden en la mesa.`}</p>
+    <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad (si son impares, la mesa 1 lleva uno más). Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El sorteo define el orden en la mesa.`}</p>
     ${two?`<div class="fields">${sel(0)}${sel(1)}</div>`:''}
     ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas" ${ready?'':'disabled'}>${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button>
       ${ready?'':'<span class="small muted">Elegí a los dos que reparten para sortear.</span>'}</div>`}
@@ -936,6 +936,14 @@ function vStats(){
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
     head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
     row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+  }
+  const split=!per&&ui.statsType==='all';
+  if(split){
+    const bt={mie:stats('mie'),vie:stats('vie')},by=k=>Object.fromEntries(bt[k].rows.map(r=>[r.id,r.pts]));
+    const pm=by('mie'),pv=by('vie');rows=rows.map(r=>({...r,ptsMie:pm[r.id]||0,ptsVie:pv[r.id]||0}));
+    head=head.replace('<th class="r">PJ</th>','<th class="r">Mié</th><th class="r">Vie</th><th class="r">PJ</th>');
+    const base=row;row=r=>base(r).replace('</b></td>',`</b></td><td class="r muted">${r.ptsMie||''}</td><td class="r muted">${r.ptsVie||''}</td>`);
+    note+=' Mié y Vie = puntos sumados en partidas Rápido y Con rebuy de esta app.';
   }
   const m=me();
   return `<section class="card" data-suit="♣">
