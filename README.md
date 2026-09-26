@@ -25,6 +25,7 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
   uno; con uno solo en pie se completa el podio. En rápido se habilita al arrancar el reloj, en con
   rebuy cuando se cierra el rebuy. "Volver" deshace una eliminación.
 - Cada jugador puede tener mano favorita (ej. 44, K9) y frase típica; se muestran en chiquito entre paréntesis al lado del nombre. Se cargan con "Editar" en Jugadores.
+- Cada jugador indica si juega miércoles y viernes o solo viernes (en Editar). En las partidas Rápido (miércoles) no aparecen en la asistencia los de solo viernes.
 - Mesas: hasta 11 jugadores, una mesa; con 12 o más, dos mesas mitad y mitad. Se eligen los dos repartidores y "Sortear mesas" manda a cada uno a una mesa distinta y reparte al resto al azar (si son impares, la mesa 1 lleva uno más).
 - Resultado: se completa solo con las eliminaciones, pero se puede elegir 1º/2º/3º a mano en cualquier momento; desde ahí las eliminaciones no lo pisan (botón "Usar las eliminaciones" para volver).
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
