@@ -261,6 +261,16 @@ tfoot td{font-weight:700;border-bottom:0}
 .mesa li .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mesa li.out .nm{color:var(--muted);text-decoration:line-through;font-weight:500}
 .ptxt{font-size:.78em;font-weight:500;color:var(--muted);font-style:italic}
+.played{display:flex;flex-direction:column}
+.played button{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:12px 4px;border-top:1px solid var(--line)}
+.played button:first-child{border-top:0}
+.played button:hover{background:var(--paper-2)}
+.played button:focus-visible{outline:2px solid var(--focus)}
+.played .phd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.played .pot{margin-left:auto;font-weight:700}
+.played .pods{display:flex;flex-wrap:wrap;gap:4px 12px}
+.played .pod{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:600;min-width:0}
+.played .pod .nm{white-space:nowrap}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -978,14 +988,19 @@ function vStats(){
   </section>`;
 }
 
-// Partido vigente: el que tiene el reloj andando, si no uno ya empezado, si no el de hoy.
+// Partido vigente: el que tiene el reloj andando, si no uno ya empezado, si no el de hoy (solo de ayer en adelante,
+// así un partido viejo que quedó sin cerrar no aparece como "en juego").
+const ayer=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d)};
 function vigente(){
-  const open=openGames();
+  const open=openGames().filter(([,g])=>g.date>=ayer());
   return open.find(([,g])=>g.timer?.running)||open.find(([,g])=>tstate(g).started)||open.find(([,g])=>g.date===today())||null;
 }
 function vInicio(){
-  const v=vigente(),open=openGames().filter(([id])=>!v||id!==v[0]);
-  const played=Object.entries(S.games).filter(([,g])=>g.status==='closed').sort((a,b)=>(b[1].date+(b[1].time||'')).localeCompare(a[1].date+(a[1].time||'')));
+  const v=vigente(),rest=openGames().filter(([id])=>!v||id!==v[0]);
+  // arriba: los que todavía se pueden anotar; abajo: los jugados (y los pasados que quedaron sin cerrar)
+  const open=rest.filter(([,g])=>g.date>=today());
+  const played=[...Object.entries(S.games).filter(([,g])=>g.status==='closed'),...rest.filter(([,g])=>g.date<today())]
+    .sort((a,b)=>(b[1].date+(b[1].time||'')).localeCompare(a[1].date+(a[1].time||'')));
   let live;
   if(v){
     const [id,g]=v,ts=tstate(g),c=calc(g),t=TYPES[g.type];
@@ -1008,16 +1023,18 @@ function vInicio(){
   }else live=`<section class="card" data-suit="♠"><h2>No hay partido en juego</h2>
       <p class="muted" style="margin:0">${open.length?`El próximo es el ${fmtDate(open[0][1].date)}${open[0][1].time?' a las '+esc(open[0][1].time):''}.`:'No hay partidos programados.'}</p>
       <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
-  const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><div class="hist">${open.map(([id,g])=>{const c=calc(g);
+  const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
       return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
         <span><b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}</span></span>
-        <span class="small muted">Ver ›</span></button>`}).join('')}</div></section>`:'';
+        <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
+  const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
-    ${played.length?`<div class="hist">${played.map(([id,g])=>{const c=calc(g),r=g.result||{};
-      return `<button data-act="goGame" data-id="${id}">${r.p1?avatar(r.p1,40):`<span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>`}
-        <span><b>${fmtDate(g.date)}</b> · ${TYPES[g.type].name} · ${c.playing.length} jug.
-        <span class="small muted" style="display:block">${r.p1?'🏆 '+esc(pname(r.p1)):''}${r.p2?' · 2º '+esc(pname(r.p2)):''}${r.p3?' · 3º '+esc(pname(r.p3)):''}</span></span>
-        <span class="num"><b>${money(c.pot)}</b></span></button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
+    ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
+      const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('');
+      return `<button data-act="goGame" data-id="${id}">
+        <span class="phd"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span><b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
+        ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
+      </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
   return live+next+past;
 }
