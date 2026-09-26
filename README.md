@@ -12,6 +12,9 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
   puntos 5/2, premio 70/30.
 - **Con rebuy (viernes)**: niveles de 12 min, rebuys por jugador hasta terminar el nivel 10-20,
   puntos 7/3/1, premio 60/30/10.
+- **Timer por etapas**: los niveles no avanzan solos. Al llegar a 0:00 suena la alarma y el reloj queda
+  esperando "Arrancar siguiente". Después del 10-20 hay un break (20 min por defecto, 0 = sin break).
+  La alarma necesita un primer toque en la pantalla del dispositivo (regla de los navegadores).
 - Ciegas (chica): 1-2-3-4-5-6-8-10-12-15-20-25-30-40-50-60-80-100…; la grande es el doble.
 - Asistencia: No va / Juega / Juega + come. La comida se divide entre los que comen.
 - **Avatares**: cada jugador elige ficha de color (con sus iniciales), carta, emoji o foto propia

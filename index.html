@@ -188,6 +188,13 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .ladder span.past{opacity:.28;text-decoration:line-through}
 .ladder span.cur{opacity:1;background:var(--gold);border-color:var(--gold);color:var(--ink)}
 .ladder span.cut{border-color:#F07A74;border-style:dashed}
+.clock.done{color:#F07A74}
+@media (prefers-reduced-motion:no-preference){.clock.done{animation:pulse .8s ease-in-out infinite}}
+.donemsg{background:var(--gold);color:var(--ink);font-weight:700;padding:8px 12px;border-radius:8px}
+.tctl .btn.gold{background:linear-gradient(180deg,#E6BD55,var(--gold));border-color:var(--gold-2);color:var(--ink)}
+.btn.go{font-size:16px;padding-inline:18px}
+.card .tctl .btn.go{order:-1;flex-basis:100%;min-height:48px}
+.ladder span.brk{border-style:dotted;font-style:italic}
 .rebuyst{font-weight:600;font-size:14px;padding:7px 12px;border-radius:8px;background:rgba(255,255,255,.07);align-self:flex-start}
 .rebuyst.closed{background:var(--red);color:#fff}
 @media (max-width:560px){.tgrid{grid-template-columns:auto 1fr}.tgrid .tb{grid-column:1/-1;text-align:left!important}}
@@ -282,7 +289,9 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .ladder span{font-size:clamp(12px,1.25vw,24px);opacity:.6}
 .proj .ladder span.cur{opacity:1}
 .proj .tctl{grid-column:1/-1;justify-content:center;opacity:.3;transition:opacity .2s}
-.proj .tctl:hover,.proj .tctl:focus-within{opacity:1}
+.proj .tctl:hover,.proj .tctl:focus-within,.proj .tctl.isdone{opacity:1}
+.proj .donemsg{font-size:clamp(16px,1.9vw,34px);align-self:flex-start;padding:.5vw 1.2vw}
+.proj .tctl .btn.go{font-size:clamp(16px,1.6vw,28px)}
 @media (max-aspect-ratio:1/1){
   .proj{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:auto;padding-left:16px;padding-right:16px}
   .proj .clock{font-size:26vw}.proj .pbl .blinds{font-size:14vw}
@@ -433,12 +442,30 @@ function calc(g){
   }));
   return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food};
 }
+// Etapas: niveles de ciegas y un break después del 10-20. Nada avanza solo:
+// al llegar a 0:00 la etapa queda terminada hasta que alguien arranca la siguiente.
+const brkMin=g=>g.breakMin===''||g.breakMin==null?20:Math.max(0,+g.breakMin||0);
+function nextStage(g,t){ if(!t.brk&&(t.level||0)===REBUY_CUT&&brkMin(g)>0) return {level:REBUY_CUT,brk:true}; return {level:(t.level||0)+1,brk:false}; }
+function prevStage(g,t){ if(t.brk) return {level:t.level,brk:false}; if(t.level===REBUY_CUT+1&&brkMin(g)>0) return {level:REBUY_CUT,brk:true}; return {level:Math.max(0,(t.level||0)-1),brk:false}; }
 function tstate(g){
-  const t=g.timer||{running:false,anchor:0,acc:0,level:0};
-  const dur=(+g.levelMin||TYPES[g.type].min)*60000;
-  const el=(t.acc||0)+(t.running?Date.now()-t.anchor:0);
-  const adv=Math.floor(el/dur);
-  return {t,dur,el,level:(t.level||0)+adv,rem:dur-(el%dur),running:!!t.running};
+  const t={running:false,anchor:0,acc:0,level:0,brk:false,...(g.timer||{})};
+  const dur=(t.brk?brkMin(g):(+g.levelMin||TYPES[g.type].min))*60000;
+  const raw=(t.acc||0)+(t.running?Date.now()-t.anchor:0);
+  const done=raw>=dur, el=Math.min(raw,dur);
+  return {t,dur,el,over:raw-dur,level:t.level||0,brk:!!t.brk,rem:dur-el,running:!!t.running&&!done,done,
+    started:(t.acc||0)>0||!!t.running||(t.level||0)>0||!!t.brk};
+}
+const rebuyClosed=ts=>ts.level>REBUY_CUT||ts.brk||(ts.level===REBUY_CUT&&ts.done);
+const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
+function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level)}`}
+function ladder(g,ts){
+  const vie=g.type==='vie',hasBrk=brkMin(g)>0;
+  return BLINDS.map((b,i)=>{
+    const cur=i===ts.level&&!ts.brk,past=i<ts.level||(i===ts.level&&ts.brk);
+    let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`;
+    if(i===REBUY_CUT&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>REBUY_CUT?'past':''}">Break ${brkMin(g)}'</span>`;
+    return h;
+  }).join('');
 }
 function stats(type){
   const games=Object.values(S.games).filter(g=>g.status==='closed'&&(type==='all'||g.type===type));
@@ -524,7 +551,7 @@ function vNewGame(){
 
 function vGame(gid,g){
   const t=TYPES[g.type],c=calc(g),parts=g.parts||{},closed=g.status==='closed',m=me();
-  const ts=tstate(g),rbClosed=g.type==='vie'&&ts.level>REBUY_CUT;
+  const ts=tstate(g),rbClosed=g.type==='vie'&&rebuyClosed(ts);
   const list=sortedPlayers().filter(([id,p])=>p.active!==false||parts[id]).sort((a,b)=>(b[0]===m)-(a[0]===m));
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
@@ -566,6 +593,7 @@ function vGame(gid,g){
       <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} ($)</span><input type="number" min="0" step="100" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${g.rebuyPrice??''}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
       <label><span class="label">Comida total ($)</span><input type="number" min="0" step="100" id="g-food" data-chg="num" data-k="food" value="${g.food??''}" ${closed?'disabled':''}></label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
+      <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
     <div class="small muted">${g.type==='mie'&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${g.type==='vie'?'rebuy':'recompra'} × ${c.rebuys}.`}
       ${c.eaters.length?` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`:''}</div>
@@ -609,30 +637,37 @@ function podium(items){
 }
 
 function vTimer(g,ts,big){
-  const vie=g.type==='vie',rbClosed=vie&&ts.level>REBUY_CUT;
+  const vie=g.type==='vie',rbClosed=vie&&rebuyClosed(ts);
   const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
-  const ctl=`<div class="tctl">
-      <button class="btn icon" data-act="tprev" aria-label="Nivel anterior">⏮</button>
-      ${ts.running?`<button class="btn pri" data-act="tpause">Pausa</button>`:`<button class="btn pri" data-act="tplay">${ts.el>0||ts.level>0?'Seguir':'Empezar'}</button>`}
-      <button class="btn icon" data-act="tnext" aria-label="Nivel siguiente">⏭</button>
-      <button class="btn" data-act="trestart" title="Reinicia el reloj del nivel actual">↺ Nivel</button>
+  const locked=ui.sound&&!audioOk();
+  const main=ts.done?`<button class="btn gold go" data-act="tgo">▶ ${nextLabel(g,ts)}</button>`
+    :ts.running?`<button class="btn pri" data-act="tpause">Pausa</button>`:`<button class="btn pri" data-act="tplay">${ts.started?'Seguir':'Empezar'}</button>`;
+  const ctl=`<div class="tctl ${ts.done?'isdone':''}">
+      <button class="btn icon" data-act="tprev" aria-label="Etapa anterior">⏮</button>
+      ${main}
+      <button class="btn icon" data-act="tnext" aria-label="Etapa siguiente">⏭</button>
+      <button class="btn" data-act="trestart" title="Vuelve el reloj de esta etapa al principio">↺ Reiniciar</button>
       ${big?'':`<button class="btn ${ui.armed==='treset'?'armed':''}" data-act="treset">${ui.armed==='treset'?'¿Reset?':'Reset'}</button>`}
-      <button class="btn" data-act="sound" aria-pressed="${ui.sound}">${ui.sound?'🔔':'🔕'}</button>
+      <button class="btn ${locked?'gold':''}" data-act="sound" aria-pressed="${ui.sound}">${!ui.sound?'🔕':locked?'🔔 Activar sonido':'🔔'}</button>
       <button class="btn" data-act="big">${big?'Salir (Esc)':'Proyectar'}</button>
     </div>`;
   const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.level===REBUY_CUT?'Último nivel con rebuy (10-20)':'Rebuy abierto hasta terminar 10-20'}</div>`:'';
-  if(big) return {ctl,rb,mm,ss};
-  const lad=BLINDS.map((b,i)=>`<span class="${i<ts.level?'past':i===ts.level?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`).join('');
-  return `<section class="card timer">
+  const doneMsg=ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · esperando para arrancar</div>`:'';
+  const blindsNow=ts.brk?'Break':blind(ts.level);
+  const nextBl=ts.brk?blind(ts.level+1):(nextStage(g,ts.t).brk?'Break':blind(ts.level+1));
+  const clk=`${mm}:${String(ss).padStart(2,'0')}`;
+  if(big) return {ctl,rb,clk,doneMsg,blindsNow,nextBl};
+  return `<section class="card timer ${ts.done?'isdone':''}">
     <div class="tgrid">
-      <div class="dealer" aria-label="Nivel ${ts.level+1}"><div><small>NIVEL</small><b>${ts.level+1}</b></div></div>
-      <div><div class="label">${+g.levelMin||TYPES[g.type].min} min por nivel</div>
-        <div class="clock ${ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${mm}:${String(ss).padStart(2,'0')}</div></div>
-      <div class="tb" style="text-align:right"><div class="label">Ciegas</div><div class="blinds">${blind(ts.level)}</div>
-        <div class="small onfelt">Próximas ${blind(ts.level+1)}</div></div>
+      <div class="dealer" aria-label="${stageName(ts)}">${ts.brk?'<div><small>BREAK</small><b>☕</b></div>':`<div><small>NIVEL</small><b>${ts.level+1}</b></div>`}</div>
+      <div><div class="label">${ts.brk?'Break · '+brkMin(g):(+g.levelMin||TYPES[g.type].min)} min${ts.brk?'':' por nivel'}</div>
+        <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div></div>
+      <div class="tb" style="text-align:right"><div class="label">Ciegas</div><div class="blinds">${blindsNow}</div>
+        <div class="small onfelt">Próximas ${nextBl}</div></div>
     </div>
+    ${doneMsg}
     ${rb}
-    <div class="ladder" aria-label="Estructura de ciegas">${lad}</div>
+    <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
     ${ctl}
   </section>`;
 }
@@ -642,18 +677,18 @@ function renderBig(){
   if(!ui.big){w.innerHTML='';return}
   if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Liga de Poker</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
   const ts=tstate(g),t=TYPES[g.type],c=calc(g),vie=g.type==='vie',parts=g.parts||{};
-  const {ctl,rb,mm,ss}=vTimer(g,ts,true);
+  const {ctl,rb,clk,doneMsg,blindsNow,nextBl}=vTimer(g,ts,true);
   const players=c.playing.map(id=>({id,name:pname(id),p:parts[id]})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   const tag=x=>vie
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
-  const lad=BLINDS.map((b,i)=>`<span class="${i<ts.level?'past':i===ts.level?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`).join('');
-  w.innerHTML=`<div class="proj" role="dialog" aria-label="Pantalla de juego">
+  w.innerHTML=`<div class="proj ${ts.done?'isdone':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
-      <div class="phead"><span class="brandp">Liga de Poker</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· Nivel <b>${ts.level+1}</b> · ${+g.levelMin||t.min} min</span></div>
-      <div class="clock ${ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${mm}:${String(ss).padStart(2,'0')}</div>
-      <div><div class="plab">Ciegas</div><div class="pbl"><div class="blinds">${blind(ts.level)}</div><div class="pnext">Próximas <b>${blind(ts.level+1)}</b></div></div></div>
-      ${ts.running?'':`<div class="plab" style="color:var(--gold)">${ts.el>0||ts.level>0?'En pausa':'Esperando para empezar'}</div>`}
+      <div class="phead"><span class="brandp">Liga de Poker</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min</span></div>
+      <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
+      <div><div class="plab">${ts.brk?'Descanso':'Ciegas'}</div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></div>
+      ${doneMsg||(ts.running?'':`<div class="plab" style="color:var(--gold)">${ts.started?'En pausa':'Esperando para empezar'}</div>`)}
+      ${ui.sound&&!audioOk()?'<div class="plab" style="color:var(--gold)">Tocá la pantalla una vez para activar la alarma</div>':''}
       ${rb}
     </div>
     <aside class="pside">
@@ -662,7 +697,7 @@ function renderBig(){
       <div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>
       <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${tag(x)}</li>`).join('')||'<li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
     </aside>
-    <div class="ladder" aria-label="Estructura de ciegas">${lad}</div>
+    <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
     ${ctl}
   </div>`;
 }
@@ -670,7 +705,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&ui.avFor){ACT.avClose();return}
   if(!ui.big||e.target.closest('input,select,textarea'))return;
   if(e.key==='Escape'){ACT.big()}
-  else if(e.key===' '){e.preventDefault();const [,g]=currentGame();if(g)(tstate(g).running?ACT.tpause:ACT.tplay)()}
+  else if(e.key===' '){e.preventDefault();const [,g]=currentGame();if(g){const ts=tstate(g);(ts.done?ACT.tgo:ts.running?ACT.tpause:ACT.tplay)()}}
   else if(e.key==='ArrowRight')ACT.tnext();
   else if(e.key==='ArrowLeft')ACT.tprev();
 });
@@ -752,33 +787,59 @@ function vHistorial(){
   </section>`;
 }
 
-/* ---------- timer ---------- */
-let lastLevel=null,lastWarn=false,wake=null;
+/* ---------- timer y alarma ---------- */
+let lastKey=null,lastDone=null,lastWarn=false,alarmed=null,lastAudio=null,wake=null;
 function tick(fromRender){
-  const [,g]=ui.tab==='partida'||ui.big?currentGame():[];
-  if(!g){lastLevel=null;return}
-  const ts=tstate(g);
-  if(!fromRender&&lastLevel!==null&&ts.level!==lastLevel&&ts.running){beep(3);lastLevel=ts.level;render();return}
-  lastLevel=ts.level;
+  const [gid,g]=ui.tab==='partida'||ui.big?currentGame():[];
+  if(!g){lastKey=null;return}
+  const ts=tstate(g),key=gid+':'+ts.level+':'+ts.brk;
+  if(!fromRender){
+    // la etapa terminó recién (menos de 10 s): alarma una sola vez por etapa
+    if(ts.done&&ts.t.running&&ts.over<10000&&alarmed!==key){alarmed=key;alarm()}
+    const au=audioOk();
+    if(key!==lastKey||ts.done!==lastDone||au!==lastAudio){lastKey=key;lastDone=ts.done;lastAudio=au;render();return}
+  }
+  lastKey=key;lastDone=ts.done;lastAudio=audioOk();
   const warn=ts.running&&ts.rem<60000;
   if(warn&&!lastWarn&&!fromRender)beep(1);
   lastWarn=warn;
   const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
-  document.querySelectorAll('[data-t="clock"]').forEach(el=>{el.textContent=mm+':'+String(ss).padStart(2,'0');el.classList.toggle('warn',warn)});
+  document.querySelectorAll('[data-t="clock"]').forEach(el=>{el.textContent=mm+':'+String(ss).padStart(2,'0');if(!ts.done)el.classList.toggle('warn',warn)});
   if(ts.running&&!wake&&navigator.wakeLock&&document.visibilityState==='visible'){navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>wake=null)}).catch(()=>{})}
 }
 setInterval(()=>tick(false),250);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render()});
+// Los navegadores no dejan sonar nada hasta que la persona toca la página:
+// el primer toque o tecla crea y despierta el audio.
 let actx=null;
+function audioOk(){return !!actx&&actx.state==='running'}
+function unlockAudio(){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state!=='running')actx.resume().then(()=>tick(false)).catch(()=>{})}catch{}
+}
+document.addEventListener('pointerdown',unlockAudio,true);
+document.addEventListener('keydown',unlockAudio,true);
+function tone(freq,t0,len,vol,type){
+  const o=actx.createOscillator(),gn=actx.createGain();
+  o.type=type||'sine';o.frequency.value=freq;
+  gn.gain.setValueAtTime(.0001,t0);gn.gain.exponentialRampToValueAtTime(vol,t0+.015);gn.gain.exponentialRampToValueAtTime(.0001,t0+len);
+  o.connect(gn).connect(actx.destination);o.start(t0);o.stop(t0+len+.05);
+}
 function beep(n){
-  if(!ui.sound)return;
+  if(!ui.sound||!audioOk())return;
+  try{for(let i=0;i<n;i++)tone(n>1?880:660,actx.currentTime+i*.35,.28,.5)}catch{}
+  try{navigator.vibrate&&navigator.vibrate(150)}catch{}
+}
+function alarm(){
+  try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400,150,800])}catch{}
+  if(!ui.sound||!audioOk())return;
   try{
-    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
-    for(let i=0;i<n;i++){const o=actx.createOscillator(),gn=actx.createGain(),t0=actx.currentTime+i*.35;
-      o.frequency.value=n>1?880:660;gn.gain.setValueAtTime(.001,t0);gn.gain.exponentialRampToValueAtTime(.4,t0+.02);gn.gain.exponentialRampToValueAtTime(.001,t0+.28);
-      o.connect(gn).connect(actx.destination);o.start(t0);o.stop(t0+.3)}
+    // campana de fin de nivel: tres rondas de "ding-dong" fuertes
+    const t=actx.currentTime;
+    for(let r=0;r<3;r++)for(let i=0;i<3;i++){
+      const t0=t+r*1.3+i*.32;
+      tone(1320,t0,.28,.35,'square');tone(988,t0+.14,.3,.35,'triangle');
+    }
   }catch{}
-  try{navigator.vibrate&&navigator.vibrate(n>1?[200,100,200,100,200]:150)}catch{}
 }
 function setTimer(gid,t){return Store.update('games',gid,{timer:t})}
 
@@ -796,8 +857,8 @@ const ACT={
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
       const id=uid('g'),g={type,date,time:ui.newTime||'',status:'open',createdAt:Date.now(),
-        entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,parts:{},result:{},
-        timer:{running:false,anchor:0,acc:0,level:0}};
+        entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
+        timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
       await Store.set('games',id,g);
@@ -807,13 +868,14 @@ const ACT={
   st:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
   rq:d=>{const [gid,g]=currentGame();Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
   rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
-  tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);beep(0);setTimer(gid,{running:true,anchor:Date.now(),acc:ts.t.acc||0,level:ts.t.level||0})},
-  tpause:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:false,anchor:0,acc:ts.el,level:ts.t.level||0})},
-  tnext:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level+1})},
-  tprev:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:Math.max(0,ts.level-1)})},
-  trestart:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level})},
-  treset:()=>{if(ui.armed!=='treset'){arm('treset');return}ui.armed=null;const [gid]=currentGame();setTimer(gid,{running:false,anchor:0,acc:0,level:0})},
-  sound:()=>{ui.sound=!ui.sound;try{localStorage.setItem('poker.sound',ui.sound?'1':'0')}catch{}if(ui.sound)beep(1);render()},
+  tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
+  tpause:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:false,anchor:0,acc:ts.el,level:ts.level,brk:ts.brk})},
+  tgo:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=nextStage(g,ts.t);setTimer(gid,{running:true,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
+  tnext:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();const n=nextStage(g,ts.t);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
+  tprev:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=prevStage(g,ts.t);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
+  trestart:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level,brk:ts.brk})},
+  treset:()=>{if(ui.armed!=='treset'){arm('treset');return}ui.armed=null;const [gid]=currentGame();setTimer(gid,{running:false,anchor:0,acc:0,level:0,brk:false})},
+  sound:()=>{unlockAudio();if(ui.sound&&!audioOk()){setTimeout(()=>{beep(1);render()},150);return}ui.sound=!ui.sound;try{localStorage.setItem('poker.sound',ui.sound?'1':'0')}catch{}if(ui.sound)setTimeout(()=>beep(1),150);render()},
   big:()=>{ui.big=!ui.big;try{history.replaceState(null,'',ui.big?'#pantalla':location.pathname+location.search)}catch{}if(ui.big){try{document.documentElement.requestFullscreen?.().catch(()=>{})}catch{}}else{try{document.fullscreenElement&&document.exitFullscreen()}catch{}}render()},
   closeGame:()=>{const [gid]=currentGame();Store.update('games',gid,{status:'closed',closedAt:Date.now(),timer:{running:false}})},
   reopen:()=>{const [gid]=currentGame();Store.update('games',gid,{status:'open'})},
