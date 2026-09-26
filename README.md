@@ -35,3 +35,7 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 
 Datos en la base del artefacto: `players/<id>` y `games/<id>`. Si se abre fuera de claude.ai,
 guarda en el navegador (localStorage).
+
+## Video explicativo
+
+`video/liga-poker-tutorial.mp4` recorre la app paso a paso con datos de ejemplo. Se regenera con `node video/grabar.mjs <carpeta>` (Playwright) y se convierte a MP4 con ffmpeg.
