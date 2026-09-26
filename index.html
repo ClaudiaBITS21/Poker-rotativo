@@ -525,6 +525,8 @@ function stats(type){
     }
     ['p1','p2','p3'].forEach((k,i)=>{const id=res[k];if(id&&out[id]&&t.pts[i]!=null){out[id][k]++;out[id].pts+=t.pts[i];out[id].won+=c.prizes[i]||0;}});
   }
+  // Puntos y partidas ganadas de la liga anterior (solo cuentan en "Todos")
+  if(type==='all') for(const [id,p] of Object.entries(S.players)) if(p.prev&&out[id]){out[id].pts+=p.prev.pts||0;out[id].p1+=p.prev.won||0;out[id].prev=true}
   return {games:games.length,rows:Object.values(out).sort((a,b)=>b.pts-a.pts||b.p1-a.p1||b.pj-a.pj||a.name.localeCompare(b.name,'es'))};
 }
 
@@ -821,7 +823,7 @@ function vJugadores(){
       return `<div class="prow">${name}<div class="row">
         ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Renombrar</button>`}
         <button class="btn" data-act="toggleActive" data-pid="${id}">${p.active===false?'Reactivar':'Retirar'}</button>
-        ${r.pj?'':`<button class="btn danger ${armed?'armed':''}" data-act="delPlayer" data-pid="${id}">${armed?'¿Borrar?':'Borrar'}</button>`}
+        ${r.pj||p.prev?'':`<button class="btn danger ${armed?'armed':''}" data-act="delPlayer" data-pid="${id}">${armed?'¿Borrar?':'Borrar'}</button>`}
       </div></div>`}).join('')}</div>`:`<p class="empty">Todavía no hay jugadores. Escribí un nombre y tocá Agregar.</p>`}
     <p class="small muted">Tocá un avatar para cambiarlo. Arriba a la derecha elegí quién sos para tener tu fila primero. "Retirar" lo saca de la asistencia sin perder su historial; solo se puede borrar a quien nunca jugó.</p>
   </section>`;
@@ -831,13 +833,14 @@ function vStats(){
   const st=stats(ui.statsType);
   const tabs=[['all','Todos'],['mie','Rápido'],['vie','Con rebuy']].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
   const rows=st.rows.filter(r=>r.pj||r.active);
+  const hasPrev=rows.some(r=>r.prev);
   const top=rows.filter(r=>r.pts>0).slice(0,3);
   const pct=r=>r.eligible?Math.round(r.pj/r.eligible*100)+'%':'—';
   return `<section class="card" data-suit="♣">
     <h2>Tabla</h2>
     <div class="gamepick">${tabs}</div>
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:r.pts+' pts',sub:r.pj+' PJ'}))):''}
-    <p class="small muted">${st.games} partidas cerradas. Asistencia = partidas jugadas sobre las que hubo desde que se sumó.</p>
+    <p class="small muted">${st.games} partidas cerradas. Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${hasPrev?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr><th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${ui.statsType==='mie'?'':'<th class="r">3º</th>'}<th class="r">${ui.statsType==='mie'?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th></tr></thead>
       <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}${esc(r.name)}</span></td><td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${ui.statsType==='mie'?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td></tr>`).join('')}</tbody>
