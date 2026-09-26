@@ -354,6 +354,9 @@ const Store={
           ui.loaded=true;render();
         },e=>{ui.err='Se perdió la conexión con la base ('+e.code+'). Recargá la página.';render();});
       }
+    }else if(window.claude&&claude.use){
+      // dentro de claude.ai pero sin acceso a la base compartida: no mostrar una liga vacía
+      this.mode='blocked';ui.loaded=true;render();
     }else{
       this.mode='local';
       try{const raw=JSON.parse(localStorage.getItem('poker.data')||'{}');S.players=raw.players||{};S.games=raw.games||{};}catch{}
@@ -495,7 +498,7 @@ function stats(type){
 function renderConn(){
   const el=$('#conn');
   el.className='conn '+(Store.mode==='db'?'ok':Store.mode==='local'?'local':'');
-  el.lastElementChild.textContent=Store.mode==='db'?'Datos compartidos con el grupo':Store.mode==='local'?'Guardado solo en este dispositivo':'Conectando…';
+  el.lastElementChild.textContent=Store.mode==='db'?'Datos compartidos con el grupo':Store.mode==='local'?'Guardado solo en este dispositivo':Store.mode==='blocked'?'Sin acceso a los datos compartidos':'Conectando…';
 }
 function render(){
   // preserva foco y cursor si alguien escribe mientras llega un cambio
@@ -507,6 +510,10 @@ function render(){
     :sortedPlayers().length?`<select class="mesel" id="me-sel" data-chg="me" aria-label="Quién sos"><option value="">¿Quién sos?</option>${sortedPlayers().filter(([,p])=>p.active!==false).map(([id,p])=>`<option value="${id}">${esc(p.name)}</option>`).join('')}</select>`:'';
   let h=ui.err?`<div class="err" data-act="clearErr">${esc(ui.err)} · <u>cerrar</u></div>`:'';
   if(!ui.loaded) h+=`<div class="card empty">Mezclando las cartas…</div>`;
+  else if(Store.mode==='blocked') h+=`<section class="card r" data-suit="♥"><h2>No tenés acceso a las partidas</h2>
+    <p>Esta app guarda las partidas en una base compartida, y tu cuenta todavía no tiene permiso para verla. Por eso no ves los jugadores ni las partidas que ya se cargaron.</p>
+    <p><b>Qué hacer:</b> pedile a quien te pasó el link que te invite desde el botón <b>Compartir</b> del artefacto, con el mail de tu cuenta de Claude. Como <b>Editor</b> vas a poder anotar asistencia y rebuys; como <b>Lector</b>, solo mirar.</p>
+    <p class="small muted">Un link público no alcanza: los datos compartidos solo se ven con una cuenta invitada. Después de que te inviten, recargá esta página.</p></section>`;
   else h+=({partida:vPartida,jugadores:vJugadores,stats:vStats,historial:vHistorial})[ui.tab]();
   $('#main').innerHTML=h;
   renderBig();
@@ -681,6 +688,7 @@ function vTimer(g,ts,big){
 }
 function renderBig(){
   const w=$('#bigwrap');
+  if(Store.mode==='blocked'){w.innerHTML='';return}
   const [,g]=ui.big?currentGame():[];
   if(!ui.big){w.innerHTML='';return}
   if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Liga de Poker</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
