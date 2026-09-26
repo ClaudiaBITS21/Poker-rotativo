@@ -426,14 +426,14 @@ function calc(g){
   const eaters=playing.filter(id=>parts[id].st==='come');
   const rebuys=g.type==='vie'?playing.reduce((s,id)=>s+(parts[id].rb||0),0):playing.filter(id=>parts[id].rq).length;
   const entry=+g.entry||0,rbp=+g.rebuyPrice||0,food=+g.food||0;
-  const pot=entry*playing.length+(g.type==='vie'?rbp*rebuys:0);
+  const pot=entry*playing.length+rbp*rebuys;
   const prizes=t.split.map(p=>Math.floor(pot*p/100));
   prizes[0]+=pot-prizes.reduce((a,b)=>a+b,0);
   const foodShare=eaters.length?food/eaters.length:0;
   const owes=Object.fromEntries(playing.map(id=>{
-    const rb=g.type==='vie'?(parts[id].rb||0)*rbp:0;
+    const n=g.type==='vie'?(parts[id].rb||0):(parts[id].rq?1:0),rb=n*rbp;
     const f=parts[id].st==='come'?foodShare:0;
-    return [id,{entry,rb,food:f,total:entry+rb+f}];
+    return [id,{entry,n,rb,food:f,total:entry+rb+f}];
   }));
   return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food};
 }
@@ -567,17 +567,17 @@ function vGame(gid,g){
     <h2>Cuentas</h2>
     <div class="fields">
       <label><span class="label">Entrada ($)</span><input type="number" min="0" step="100" id="g-entry" data-chg="num" data-k="entry" value="${g.entry??''}" ${closed?'disabled':''}></label>
-      ${g.type==='vie'?`<label><span class="label">Precio rebuy ($)</span><input type="number" min="0" step="100" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${g.rebuyPrice??''}" ${closed?'disabled':''}></label>`:''}
+      <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} ($)</span><input type="number" min="0" step="100" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${g.rebuyPrice??''}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
       <label><span class="label">Comida total ($)</span><input type="number" min="0" step="100" id="g-food" data-chg="num" data-k="food" value="${g.food??''}" ${closed?'disabled':''}></label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
     </div>
-    <div class="small muted">${g.type==='mie'?`Pozo = entrada × ${c.playing.length} jugadores (la recompra ya está incluida).`:`Pozo = entrada × ${c.playing.length} + rebuy × ${c.rebuys}.`}
+    <div class="small muted">${g.type==='mie'&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${g.type==='vie'?'rebuy':'recompra'} × ${c.rebuys}.`}
       ${c.eaters.length?` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`:''}</div>
     <div class="prizes">${c.prizes.map((p,i)=>`<div class="prize ${i?'':'p1'}"><span class="label">${i+1}º · ${t.split[i]}% · ${t.pts[i]} pts</span><b class="num">${money(p)}</b></div>`).join('')}</div>
     ${c.playing.length?`<div class="tw"><table class="num">
-      <thead><tr><th>Jugador</th><th class="r">Entrada</th>${g.type==='vie'?'<th class="r">Rebuys</th>':''}<th class="r">Comida</th><th class="r">Paga</th></tr></thead>
-      <tbody>${c.playing.map(id=>{const o=c.owes[id];return `<tr><td><span class="who">${avatar(id,24)}${esc(pname(id))}</span></td><td class="r">${money(o.entry)}</td>${g.type==='vie'?`<td class="r">${o.rb?money(o.rb):'—'}</td>`:''}<td class="r">${o.food?money(o.food):'—'}</td><td class="r"><b>${money(o.total)}</b></td></tr>`}).join('')}</tbody>
-      <tfoot><tr><td>Total</td><td class="r">${money((+g.entry||0)*c.playing.length)}</td>${g.type==='vie'?`<td class="r">${money((+g.rebuyPrice||0)*c.rebuys)}</td>`:''}<td class="r">${money(c.eaters.length?c.food:0)}</td><td class="r">${money(Object.values(c.owes).reduce((s,o)=>s+o.total,0))}</td></tr></tfoot>
+      <thead><tr><th>Jugador</th><th class="r">Entrada</th><th class="r">${g.type==='vie'?'Rebuys':'Recompra'}</th><th class="r">Comida</th><th class="r">Paga</th></tr></thead>
+      <tbody>${c.playing.map(id=>{const o=c.owes[id];return `<tr><td><span class="who">${avatar(id,24)}${esc(pname(id))}</span></td><td class="r">${money(o.entry)}</td><td class="r">${o.n?`<span class="muted">${o.n} ×</span> ${o.rb?money(o.rb):'incl.'}`:'—'}</td><td class="r">${o.food?money(o.food):'—'}</td><td class="r"><b>${money(o.total)}</b></td></tr>`}).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td class="r">${money((+g.entry||0)*c.playing.length)}</td><td class="r">${c.rebuys?`<span class="muted">${c.rebuys} ×</span> ${+g.rebuyPrice?money((+g.rebuyPrice)*c.rebuys):'incl.'}`:'—'}</td><td class="r">${money(c.eaters.length?c.food:0)}</td><td class="r">${money(Object.values(c.owes).reduce((s,o)=>s+o.total,0))}</td></tr></tfoot>
     </table></div>`:''}
   </section>
 
@@ -814,7 +814,7 @@ const ACT={
       const id=uid('g'),g={type,date,time:ui.newTime||'',status:'open',createdAt:Date.now(),
         entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0}};
-      if(type==='vie')g.rebuyPrice=prev.rebuyPrice??prev.entry??'';
+      g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
       await Store.set('games',id,g);
     }
