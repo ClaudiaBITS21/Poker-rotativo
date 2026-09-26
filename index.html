@@ -114,6 +114,9 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (max-width:560px){.typepick{grid-template-columns:1fr}}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .fields label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fmode{display:inline-flex;margin-left:4px;border:1px solid var(--line);border-radius:999px;overflow:hidden;vertical-align:middle;text-transform:none;letter-spacing:0}
+.fmode button{border:0;background:#fff;padding:1px 8px;font-size:11px;font-weight:700;color:var(--muted)}
+.fmode button[aria-pressed="true"]{background:var(--ink);color:var(--gold)}
 .fields input,.fields select{width:100%}
 
 /* ---- resumen con fichas ---- */
@@ -434,13 +437,16 @@ function calc(g){
   const pot=entry*playing.length+rbp*rebuys;
   const prizes=t.split.map(p=>Math.floor(pot*p/100));
   prizes[0]+=pot-prizes.reduce((a,b)=>a+b,0);
-  const foodShare=eaters.length?food/eaters.length:0;
+  // comida: se carga el total (se divide entre los que comen) o directamente el monto por persona
+  const perPerson=g.foodMode==='pp',foodPP=+g.foodPP||0;
+  const foodShare=perPerson?foodPP:(eaters.length?food/eaters.length:0);
+  const foodTotal=perPerson?foodPP*eaters.length:food;
   const owes=Object.fromEntries(playing.map(id=>{
     const n=g.type==='vie'?(parts[id].rb||0):(parts[id].rq?1:0),rb=n*rbp;
     const f=parts[id].st==='come'?foodShare:0;
     return [id,{entry,n,rb,food:f,total:entry+rb+f}];
   }));
-  return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food};
+  return {playing,eaters,rebuys,pot,prizes,foodShare,owes,food:foodTotal,perPerson};
 }
 // Etapas: niveles de ciegas y un break después del 10-20. Nada avanza solo:
 // al llegar a 0:00 la etapa queda terminada hasta que alguien arranca la siguiente.
@@ -591,12 +597,14 @@ function vGame(gid,g){
     <div class="fields">
       <label><span class="label">Entrada ($)</span><input type="number" min="0" step="100" id="g-entry" data-chg="num" data-k="entry" value="${g.entry??''}" ${closed?'disabled':''}></label>
       <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} ($)</span><input type="number" min="0" step="100" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${g.rebuyPrice??''}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
-      <label><span class="label">Comida total ($)</span><input type="number" min="0" step="100" id="g-food" data-chg="num" data-k="food" value="${g.food??''}" ${closed?'disabled':''}></label>
+      <label><span class="label">Comida ($) <span class="fmode">${[['total','Total'],['pp','Por persona']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${(g.foodMode||'total')===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></span>${c.perPerson
+        ?`<input type="number" min="0" step="100" id="g-foodpp" data-chg="num" data-k="foodPP" value="${g.foodPP??''}" placeholder="Por persona" ${closed?'disabled':''}>`
+        :`<input type="number" min="0" step="100" id="g-food" data-chg="num" data-k="food" value="${g.food??''}" placeholder="Total de la comida" ${closed?'disabled':''}>`}</label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
       <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
     <div class="small muted">${g.type==='mie'&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${g.type==='vie'?'rebuy':'recompra'} × ${c.rebuys}.`}
-      ${c.eaters.length?` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`:''}</div>
+      ${c.eaters.length?(c.perPerson?` Comida: <b>${money(c.foodShare)}</b> por persona × ${c.eaters.length} = ${money(c.food)}.`:` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`):''}</div>
     <div class="prizes">${c.prizes.map((p,i)=>`<div class="prize ${i?'':'p1'}"><span class="label">${i+1}º · ${t.split[i]}% · ${t.pts[i]} pts</span><b class="num">${money(p)}</b></div>`).join('')}</div>
     ${c.playing.length?`<div class="tw"><table class="num">
       <thead><tr><th>Jugador</th><th class="r">Entrada</th><th class="r">${g.type==='vie'?'Rebuys':'Recompra'}</th><th class="r">Comida</th><th class="r">Paga</th></tr></thead>
@@ -857,7 +865,7 @@ const ACT={
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
       const id=uid('g'),g={type,date,time:ui.newTime||'',status:'open',createdAt:Date.now(),
-        entry:prev.entry??'',food:'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
+        entry:prev.entry??'',food:'',foodMode:prev.foodMode||'total',foodPP:prev.foodMode==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
@@ -883,6 +891,7 @@ const ACT={
   edit:d=>{ui.editing=d.pid;render();const el=document.getElementById('rn-'+d.pid);el&&el.focus()},
   toggleActive:d=>{const p=S.players[d.pid];Store.update('players',d.pid,{active:p.active===false})},
   delPlayer:d=>{if(ui.armed!=='delP-'+d.pid){arm('delP-'+d.pid);return}ui.armed=null;if(ui.me===d.pid)ACT.clearMe();Store.del('players',d.pid)},
+  foodMode:d=>{const [gid]=currentGame();Store.update('games',gid,{foodMode:d.v})},
   statsType:d=>{ui.statsType=d.v;render()},
   // avatar
   avOpen:d=>{ui.avFor=d.pid;ui.avDraft={...avData(d.pid)};ui.avTab=ui.avDraft.k;render()},

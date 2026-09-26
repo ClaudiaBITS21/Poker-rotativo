@@ -16,7 +16,8 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
   esperando "Arrancar siguiente". Después del 10-20 hay un break (20 min por defecto, 0 = sin break).
   La alarma necesita un primer toque en la pantalla del dispositivo (regla de los navegadores).
 - Ciegas (chica): 1-2-3-4-5-6-8-10-12-15-20-25-30-40-50-60-80-100…; la grande es el doble.
-- Asistencia: No va / Juega / Juega + come. La comida se divide entre los que comen.
+- Asistencia: No va / Juega / Juega + come. La comida se carga como total (se divide entre los que
+  comen) o directamente como monto por persona.
 - **Avatares**: cada jugador elige ficha de color (con sus iniciales), carta, emoji o foto propia
   (se recorta y achica a 160 px y se guarda en su documento). "¿Quién sos?" arriba a la derecha
   recuerda en ese dispositivo quién es y pone su fila primero.
