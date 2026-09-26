@@ -14,6 +14,9 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
   puntos 7/3/1, premio 60/30/10.
 - Ciegas (chica): 1-2-3-4-5-6-8-10-12-15-20-25-30-40-50-60-80-100…; la grande es el doble.
 - Asistencia: No va / Juega / Juega + come. La comida se divide entre los que comen.
+- **Avatares**: cada jugador elige ficha de color (con sus iniciales), carta, emoji o foto propia
+  (se recorta y achica a 160 px y se guarda en su documento). "¿Quién sos?" arriba a la derecha
+  recuerda en ese dispositivo quién es y pone su fila primero.
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
 
