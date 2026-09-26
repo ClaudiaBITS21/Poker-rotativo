@@ -251,12 +251,16 @@ tfoot td{font-weight:700;border-bottom:0}
 .btn.undo{min-height:28px;padding:0 10px;font-size:12px}
 .proj .pplayers li.ko{opacity:.45}
 .proj .pplayers li.ko .nm{text-decoration:line-through;font-weight:500}
+.edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;width:100%}
+.edit label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.edit .row{grid-column:1/-1}
 .mesas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .mesa{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mesa ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .mesa li{display:flex;align-items:center;gap:8px;min-width:0}
 .mesa li .nm{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mesa li.out .nm{color:var(--muted);text-decoration:line-through;font-weight:500}
+.ptxt{font-size:.78em;font-weight:500;color:var(--muted);font-style:italic}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -461,6 +465,9 @@ const today=()=>ymd(new Date());
 const fmtDate=s=>{if(!s)return '';const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})};
 const blind=i=>{const s=BLINDS[Math.min(i,BLINDS.length-1)];return s+'-'+s*2};
 const pname=id=>S.players[id]?.name||'(borrado)';
+// mano favorita y frase típica, en chiquito entre paréntesis al lado del nombre
+const pextra=id=>{const p=S.players[id]||{};return [p.hand,p.phrase].filter(Boolean).join(' · ')};
+const ptag=id=>{const x=pextra(id);return x?` <span class="ptxt">(${esc(x)})</span>`:''};
 const sortedPlayers=()=>Object.entries(S.players).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
 function nextDow(dow){const d=new Date();d.setDate(d.getDate()+(dow-d.getDay()+7)%7);return ymd(d)}
 const me=()=>ui.me&&S.players[ui.me]?ui.me:null;
@@ -652,7 +659,7 @@ function vGame(gid,g){
     if(plays&&g.type==='mie') extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Pidió la recompra':'Recompra sin usar'}" aria-label="Recompra">R</button>`;
     if(plays&&g.type==='vie') extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
     const seg=[['no','✕'],['juega','♠'],['come','🍽']].map(([k,l])=>`<button data-act="st" data-pid="${id}" data-v="${k}" class="${k==='come'?'emo ':''}${st===k?'on-'+k:''}" ${closed?'disabled':''} aria-pressed="${st===k}" aria-label="${ST[k]}">${l}</button>`).join('');
-    return `<div class="arow ${id===m?'mine':''} ${st==='no'?'out':''}">${avBtn(id,30)}<span class="aname">${esc(p.name)}${id===m?' <span class="badge me">Vos</span>':''}${p.active===false?' <span class="small muted">(ret.)</span>':''}</span>${extra}<div class="aseg">${seg}</div></div>`;
+    return `<div class="arow ${id===m?'mine':''} ${st==='no'?'out':''}">${avBtn(id,30)}<span class="aname">${esc(p.name)}${ptag(id)}${id===m?' <span class="badge me">Vos</span>':''}${p.active===false?' <span class="small muted">(ret.)</span>':''}</span>${extra}<div class="aseg">${seg}</div></div>`;
   }).join('');
   const pending=list.filter(([id])=>!parts[id]?.st).length;
 
@@ -902,10 +909,14 @@ function vJugadores(){
     <form class="row" data-form="addPlayer"><input type="text" id="np-name" placeholder="Nombre" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" type="submit">Agregar</button></form>
     ${list.length?`<div class="plist">${list.map(([id,p])=>{
       const r=by[id],armed=ui.armed==='delP-'+id;
-      const name=ui.editing===id?`<form class="row" data-form="rename" data-pid="${id}"><input type="text" id="rn-${id}" value="${esc(p.name)}" autocomplete="off"><button class="btn pri" type="submit">Guardar</button></form>`
-        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div></div></div>`;
+      const name=ui.editing===id?`<form class="edit" data-form="rename" data-pid="${id}">
+          <label><span class="label">Nombre</span><input type="text" id="rn-${id}" value="${esc(p.name)}" autocomplete="off"></label>
+          <label><span class="label">Mano favorita</span><input type="text" id="rh-${id}" value="${esc(p.hand||'')}" placeholder="Ej.: 44, K9, AKs" maxlength="6" autocomplete="off" style="text-transform:uppercase"></label>
+          <label><span class="label">Frase típica</span><input type="text" id="rp-${id}" value="${esc(p.phrase||'')}" placeholder="Ej.: Nadie baja ganando" maxlength="60" autocomplete="off"></label>
+          <div class="row"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-act="editCancel">Cancelar</button></div></form>`
+        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${ptag(id)}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div></div></div>`;
       return `<div class="prow">${name}<div class="row">
-        ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Renombrar</button>`}
+        ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Editar</button>`}
         <button class="btn" data-act="toggleActive" data-pid="${id}">${p.active===false?'Reactivar':'Retirar'}</button>
         ${r.pj||p.prev?'':`<button class="btn danger ${armed?'armed':''}" data-act="delPlayer" data-pid="${id}">${armed?'¿Borrar?':'Borrar'}</button>`}
       </div></div>`}).join('')}</div>`:`<p class="empty">Todavía no hay jugadores. Escribí un nombre y tocá Agregar.</p>`}
@@ -954,7 +965,7 @@ function vStats(){
     <p class="small muted">${st.games} partidas cerradas. ${note}</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
-      <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}${esc(r.name)}</span></td>${row(r)}</tr>`).join('')}</tbody>
+      <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}<span>${esc(r.name)}${ptag(r.id)}</span></span></td>${row(r)}</tr>`).join('')}</tbody>
     </table></div>`:`<p class="empty">${per?'Todavía nadie jugó una partida cerrada.':'Todavía no hay partidas cerradas.'}</p>`}
   </section>`;
 }
@@ -1118,6 +1129,7 @@ const ACT={
     const [m1,m2=[]]=drawTables(c.playing,dl);Store.update('games',gid,{tables:{m1,m2}});
   },
   statsType:d=>{ui.statsType=d.v;render()},
+  editCancel:()=>{ui.editing=null;render()},
   statsMode:d=>{ui.statsMode=d.v;render()},
   // avatar
   avOpen:d=>{ui.avFor=d.pid;ui.avDraft={...avData(d.pid)};ui.avTab=ui.avDraft.k;render()},
@@ -1172,8 +1184,9 @@ document.addEventListener('submit',e=>{
     inp.value='';Store.set('players',uid('p'),{name,active:true,since:today(),createdAt:Date.now()}).then(()=>{const i=$('#np-name');i&&i.focus()});
   }
   if(f.dataset.form==='rename'){
-    const pid=f.dataset.pid,name=document.getElementById('rn-'+pid).value.trim();
-    ui.editing=null;if(name)Store.update('players',pid,{name});else render();
+    const pid=f.dataset.pid,v=k=>document.getElementById(k+pid).value.trim();
+    const name=v('rn-'),hand=v('rh-').toUpperCase(),phrase=v('rp-');
+    ui.editing=null;if(name)Store.update('players',pid,{name,hand,phrase});else render();
   }
 });
 render();
