@@ -546,7 +546,7 @@ function ladder(g,ts){
     return h;
   }).join('');
 }
-function stats(type){
+function stats(type,noPrev){
   const games=Object.values(S.games).filter(g=>g.status==='closed'&&(type==='all'||g.type===type));
   const out={};
   for(const [id,p] of Object.entries(S.players)) out[id]={id,name:p.name,since:p.since||'',active:p.active!==false,pj:0,eligible:0,p1:0,p2:0,p3:0,pts:0,rb:0,won:0,ate:0};
@@ -562,7 +562,7 @@ function stats(type){
     ['p1','p2','p3'].forEach((k,i)=>{const id=res[k];if(id&&out[id]&&t.pts[i]!=null){out[id][k]++;out[id].pts+=t.pts[i];out[id].won+=c.prizes[i]||0;}});
   }
   // Puntos y partidas ganadas de la liga anterior (solo cuentan en "Todos")
-  if(type==='all') for(const [id,p] of Object.entries(S.players)) if(p.prev&&out[id]){out[id].pts+=p.prev.pts||0;out[id].p1+=p.prev.won||0;out[id].prev=true}
+  if(type==='all'&&!noPrev) for(const [id,p] of Object.entries(S.players)) if(p.prev&&out[id]){out[id].pts+=p.prev.pts||0;out[id].p1+=p.prev.won||0;out[id].prev=true}
   return {games:games.length,rows:Object.values(out).sort((a,b)=>b.pts-a.pts||b.p1-a.p1||b.pj-a.pj||a.name.localeCompare(b.name,'es'))};
 }
 
@@ -868,21 +868,40 @@ function vJugadores(){
 }
 
 function vStats(){
-  const st=stats(ui.statsType);
+  // "Por partido jugado": rendimiento sobre las veces que cada uno fue (sin la liga anterior, que no tiene partidas)
+  const per=ui.statsMode==='pj',st=stats(ui.statsType,per);
   const tabs=[['all','Todos'],['mie','Rápido'],['vie','Con rebuy']].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
-  const rows=st.rows.filter(r=>r.pj||r.active);
-  const hasPrev=rows.some(r=>r.prev);
-  const top=rows.filter(r=>r.pts>0).slice(0,3);
-  const pct=r=>r.eligible?Math.round(r.pj/r.eligible*100)+'%':'—';
+  const modes=[['total','Total'],['pj','Por partido jugado']].map(([k,l])=>`<button data-act="statsMode" data-v="${k}" aria-current="${(ui.statsMode||'total')===k}">${l}</button>`).join('');
+  const dec=n=>n.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const pctOf=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+  const pct=r=>pctOf(r.pj,r.eligible);
+  const mie=ui.statsType==='mie';
+  let rows,top,note,head,row;
+  if(per){
+    rows=st.rows.filter(r=>r.pj).map(r=>({...r,avg:r.pts/r.pj,pod:r.p1+r.p2+(mie?0:r.p3)}))
+      .sort((a,b)=>b.avg-a.avg||b.pj-a.pj||a.name.localeCompare(b.name,'es'));
+    top=rows.filter(r=>r.avg>0).slice(0,3);
+    note=`Cada número está dividido por las partidas que jugó esa persona, así se compara a quien va siempre con quien va poco. No incluye la liga anterior, que no tiene partidas cargadas.`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
+    row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
+  }else{
+    rows=st.rows.filter(r=>r.pj||r.active);
+    top=rows.filter(r=>r.pts>0).slice(0,3);
+    note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
+    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+  }
+  const m=me();
   return `<section class="card" data-suit="♣">
     <h2>Tabla</h2>
     <div class="gamepick">${tabs}</div>
-    ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:r.pts+' pts',sub:r.pj+' PJ'}))):''}
-    <p class="small muted">${st.games} partidas cerradas. Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${hasPrev?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}</p>
+    <div class="gamepick">${modes}</div>
+    ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg)+' pts/PJ':r.pts+' pts',sub:r.pj+' PJ'}))):''}
+    <p class="small muted">${st.games} partidas cerradas. ${note}</p>
     ${rows.length?`<div class="tw"><table class="num">
-      <thead><tr><th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${ui.statsType==='mie'?'':'<th class="r">3º</th>'}<th class="r">${ui.statsType==='mie'?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th></tr></thead>
-      <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}${esc(r.name)}</span></td><td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${ui.statsType==='mie'?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td></tr>`).join('')}</tbody>
-    </table></div>`:`<p class="empty">Todavía no hay partidas cerradas.</p>`}
+      <thead><tr>${head}</tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}${esc(r.name)}</span></td>${row(r)}</tr>`).join('')}</tbody>
+    </table></div>`:`<p class="empty">${per?'Todavía nadie jugó una partida cerrada.':'Todavía no hay partidas cerradas.'}</p>`}
   </section>`;
 }
 
@@ -1038,6 +1057,7 @@ const ACT={
   delPlayer:d=>{if(ui.armed!=='delP-'+d.pid){arm('delP-'+d.pid);return}ui.armed=null;if(ui.me===d.pid)ACT.clearMe();Store.del('players',d.pid)},
   foodMode:d=>{const [gid]=currentGame();Store.update('games',gid,{foodMode:d.v})},
   statsType:d=>{ui.statsType=d.v;render()},
+  statsMode:d=>{ui.statsMode=d.v;render()},
   // avatar
   avOpen:d=>{ui.avFor=d.pid;ui.avDraft={...avData(d.pid)};ui.avTab=ui.avDraft.k;render()},
   avTab:d=>{

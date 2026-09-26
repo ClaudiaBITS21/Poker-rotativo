@@ -28,6 +28,7 @@ https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
 - Estadísticas: puntos, partidas jugadas, % de asistencia, puestos, rebuys, comidas y plata ganada,
   en total o por tipo de partida.
   En "Todos" se suman los puntos y partidas ganadas (1º) de la liga anterior (campo `prev` de cada jugador).
+  Vista "Por partido jugado": puntos, % de victorias, % de podios, rebuys y plata ganada divididos por las partidas que jugó cada uno (sin la liga anterior).
 
 Datos en la base del artefacto: `players/<id>` y `games/<id>`. Si se abre fuera de claude.ai,
 guarda en el navegador (localStorage).
