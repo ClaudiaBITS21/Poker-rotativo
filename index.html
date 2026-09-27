@@ -305,6 +305,19 @@ tfoot td{font-weight:700;border-bottom:0}
 .place.onfelt{color:var(--on-felt-mut)}.place.onfelt a{color:var(--gold-hi)}
 .gedit summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--muted)}
 .gedit .fields{margin-top:8px}
+.bday{background:var(--gold-soft);border:1px solid var(--gold);color:var(--ink);border-radius:10px;padding:6px 10px;font-size:14px}
+.cumples{display:flex;flex-direction:column}
+.cumple{border-top:1px solid var(--line);padding:6px 0}
+.cumple:first-child{border-top:0}
+.cumhead{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;padding:6px 0}
+.cumhead:focus-visible{outline:2px solid var(--focus)}
+.reglist{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.regrow{display:grid;grid-template-columns:minmax(0,1fr) 110px 82px;gap:6px;align-items:center}
+.regrow.out{opacity:.6}
+.regrow .chk{gap:6px;min-width:0}.regrow .chk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.regrow input.money{width:110px;min-height:34px;padding:4px 8px}
+.regrow .btn{min-height:34px;padding:4px 10px;font-size:13px}
+.btn.paid{background:var(--green);border-color:var(--green);color:#fff}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -455,7 +468,7 @@ const RANKS=['A','K','Q','J','10','9','8','7','6','5','4','3','2'];
 const EMOS=['🦈','🐟','🃏','🎩','😎','🤠','👑','💎','🍀','🔥','🎲','🥃','🍷','🍕','🤑','🧐','🦊','🐺','🦁','🐯','🐻','🐙','🦉','🐍','🦅','🤖','👻','🥷','🧙','🐢'];
 
 /* ---------- estado ---------- */
-const S={players:{},games:{}};
+const S={players:{},games:{},regalos:{}};
 const ui={tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
   armed:null,editing:null,err:null,loaded:false,avFor:null,avDraft:null,avTab:'chip'};
 try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
@@ -491,9 +504,16 @@ const FB={
     const m=this.m;this.unsub.forEach(f=>f());this.unsub=[];
     const onErr=e=>{ui.err=e.code==='permission-denied'?'Firebase no deja leer los datos: revisá que estén pegadas las reglas de seguridad.':'Se perdió la conexión ('+e.code+'). Recargá la página.';ui.loaded=true;render()};
     for(const c of ['players','games']) this.unsub.push(m.onSnapshot(m.collection(this.db,c),snap=>{S[c]=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));ui.loaded=true;render()},onErr));
+    this.watchRegalos();
     this.unsub.push(m.onSnapshot(m.collection(this.db,'pinflags'),snap=>{ui.pinflags=new Set(snap.docs.map(d=>d.id));render()},()=>{}));
     this.unsub.push(m.onSnapshot(m.doc(this.db,'config','admins'),d=>{ui.admins=d.exists()?(d.data().emails||[]):[];ui.adminPids=d.exists()?(d.data().pids||[]):[];render()},()=>{ui.admins=[];ui.adminPids=[]}));
-    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),d=>{ui.session=d.exists()?d.data().pid:null;render()},()=>{ui.session=null}));
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),d=>{ui.session=d.exists()?d.data().pid:null;this.watchRegalos();render()},()=>{ui.session=null}));
+  },
+  regUnsub:null,
+  watchRegalos(){
+    if(this.regUnsub){this.regUnsub();this.regUnsub=null}
+    if(!puedeCumples()){S.regalos={};return}
+    this.regUnsub=this.m.onSnapshot(this.m.collection(this.db,'regalos'),snap=>{S.regalos=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));render()},()=>{S.regalos={}});
   },
   set(c,id,data){return this.m.setDoc(this.m.doc(this.db,c,id),clean(data))},
   update(c,id,patch){
@@ -523,6 +543,8 @@ const FB={
 const isFB=()=>Store.mode==='fb';
 // En Firebase solo los administradores editan todo; cada jugador, su asistencia y su ficha (las reglas lo hacen cumplir).
 const ADMIN_PIDS=['pmuhuxmb6f8rh','pmuhv51jbc5kd','pmuhv64b614dy']; // Firu (Claudia), Coco y Mosca: administradores entrando con su PIN
+const CUMPLE_PIDS=['pmuhuxmb6f8rh','pmuhv51jbc5kd']; // Firu (Claudia) y Coco: solapa Cumpleaños y regalos
+const puedeCumples=()=>isFB()?!!((ui.session&&CUMPLE_PIDS.includes(ui.session))||ui.fbEmail===OWNER):!!(me()&&CUMPLE_PIDS.includes(me()));
 const esAdminPid=id=>ADMIN_PIDS.includes(id)||(ui.adminPids||[]).includes(id);
 const isAdmin=()=>!isFB()||!!(ui.fbEmail&&(ui.fbEmail===OWNER||(ui.admins||[]).includes(ui.fbEmail)))||!!(ui.session&&(ADMIN_PIDS.includes(ui.session)||(ui.adminPids||[]).includes(ui.session)));
 
@@ -534,7 +556,7 @@ const Store={
     try{ if(window.claude&&claude.use) db=await claude.use('db'); }catch{}
     if(db){
       this.db=db;this.mode='db';
-      for(const c of ['players','games']){
+      for(const c of ['players','games','regalos']){
         db.collection(c).onSnapshot(snap=>{
           S[c]=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));
           ui.loaded=true;render();
@@ -548,7 +570,7 @@ const Store={
       try{await FB.init()}catch(e){ui.err='No se pudo cargar Firebase ('+(e.code||e.message)+'). Revisá la conexión y recargá.';ui.loaded=true;render()}
     }else{
       this.mode='local';
-      try{const raw=JSON.parse(localStorage.getItem('poker.data')||'{}');S.players=raw.players||{};S.games=raw.games||{};}catch{}
+      try{const raw=JSON.parse(localStorage.getItem('poker.data')||'{}');S.players=raw.players||{};S.games=raw.games||{};S.regalos=raw.regalos||{};}catch{}
       ui.loaded=true;render();
     }
     renderConn();
@@ -640,6 +662,27 @@ async function fileToAvatar(file){
     return out;
   }finally{URL.revokeObjectURL(url)}
 }
+
+
+/* ---------- cumpleaños ---------- */
+// bday = "MM-DD" (el año es opcional, en byear)
+const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
+const fmtBday=b=>{if(!b)return '';const [m,d]=b.split('-').map(Number);return d+' '+MESES[m-1]};
+const bdayMD=d=>String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const parseYmd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+function nextBday(b,from=new Date()){const [m,d]=b.split('-').map(Number),t=new Date(from.getFullYear(),from.getMonth(),from.getDate());let n=new Date(t.getFullYear(),m-1,d);if(n<t)n=new Date(t.getFullYear()+1,m-1,d);return {date:n,days:Math.round((n-t)/864e5)}}
+// Quiénes de los anotados cumplieron años desde el partido anterior (o cumplen ese día)
+function cumplesPartido(g){
+  const c=calc(g),others=Object.values(S.games).filter(x=>x!==g&&x.date<g.date).map(x=>x.date).sort();
+  const end=parseYmd(g.date),start=others.length?parseYmd(others[others.length-1]):new Date(end.getTime()-7*864e5);
+  const out=[];
+  for(const id of c.playing){const b=S.players[id]?.bday;if(!b)continue;
+    for(let d=new Date(start.getTime()+864e5);d<=end;d=new Date(d.getTime()+864e5)){if(bdayMD(d)===b){out.push({id,hoy:+d===+end,b});break}}
+    if(out.length>20)break;}
+  return out;
+}
+const cumplesAviso=g=>{const l=cumplesPartido(g);if(!l.length)return '';
+  return `<div class="bday">🎂 ${l.map(x=>x.hoy?`¡Hoy cumple <b>${esc(pname(x.id))}</b>!`:`Cumplió <b>${esc(pname(x.id))}</b> (${fmtBday(x.b)})`).join(' · ')}</div>`};
 
 /* ---------- cálculos ---------- */
 // Premios: el 1º se redondea para arriba a los $10.000; lo que sobra se reparte entre los demás
@@ -745,7 +788,8 @@ function render(){
   // preserva foco y cursor si alguien escribe mientras llega un cambio
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
   if(soloVie()){if(ui.tab==='stats')ui.tab='inicio';ui.newType='vie'}
-  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']])]
+  if(ui.tab==='cumples'&&!puedeCumples())ui.tab='inicio';
+  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[])]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
   $('#me').innerHTML=!ui.loaded?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
@@ -758,7 +802,7 @@ function render(){
     <p>Esta app guarda las partidas en una base compartida, y tu cuenta todavía no tiene permiso para verla. Por eso no ves los jugadores ni las partidas que ya se cargaron.</p>
     <p><b>Qué hacer:</b> pedile a quien te pasó el link que te invite desde el botón <b>Compartir</b> del artefacto, con el mail de tu cuenta de Claude. Como <b>Editor</b> vas a poder anotar asistencia y rebuys; como <b>Lector</b>, solo mirar.</p>
     <p class="small muted">Un link público no alcanza: los datos compartidos solo se ven con una cuenta invitada. Después de que te inviten, recargá esta página.</p></section>`;
-  else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats})[ui.tab]();
+  else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats,cumples:vCumples})[ui.tab]();
   $('#main').innerHTML=h;
   renderBig();
   renderModal();
@@ -833,6 +877,7 @@ function vGame(gid,g){
     ${g.title?`<div class="gtitle">${gTitle(g)}</div>`:''}
     <h2>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
     ${gPlace(g)}
+    ${cumplesAviso(g)}
     <div class="row"><input type="date" id="g-date" data-chg="date" value="${esc(g.date)}" ${closed?'disabled':''} aria-label="Fecha"><input type="time" id="g-time" data-chg="time" value="${esc(g.time||'')}" ${closed?'disabled':''} aria-label="Hora"></div>
     ${closed?'':`<details class="gedit" ${ui.gedit?'open':''}><summary data-act="gedit">Nombre y lugar</summary><div class="fields">
       <label><span class="label">Nombre (opcional)</span><input type="text" id="g-title" data-chg="gtext" data-k="title" value="${esc(g.title||'')}" placeholder="Ej.: Cumple de Coco" maxlength="60"></label>
@@ -1134,10 +1179,14 @@ function vJugadores(){
       const name=ui.editing===id?`<form class="edit" data-form="rename" data-pid="${id}">
           <label><span class="label">Nombre</span><input type="text" id="rn-${id}" value="${esc(p.name)}" autocomplete="off"></label>
           <label><span class="label">Mano favorita</span><input type="text" id="rh-${id}" value="${esc(p.hand||'')}" placeholder="Ej.: 44, K9, AKs" maxlength="6" autocomplete="off" style="text-transform:uppercase"></label>
+          <label><span class="label">Cumpleaños</span><span class="row" style="gap:4px;flex-wrap:nowrap">
+            <select id="rbd-${id}" aria-label="Día"><option value="">Día</option>${Array.from({length:31},(_,i)=>i+1).map(d=>`<option ${p.bday&&+p.bday.split('-')[1]===d?'selected':''}>${d}</option>`).join('')}</select>
+            <select id="rbm-${id}" aria-label="Mes"><option value="">Mes</option>${MESES.map((m,i)=>`<option value="${i+1}" ${p.bday&&+p.bday.split('-')[0]===i+1?'selected':''}>${m}</option>`).join('')}</select>
+            <input type="number" id="rby-${id}" placeholder="Año" min="1920" max="2020" value="${p.byear||''}" style="width:80px"></span></label>
           <label><span class="label">Juega</span><select id="rd-${id}"><option value="">Miércoles y viernes</option><option value="vie" ${p.days==='vie'?'selected':''}>Solo viernes</option></select></label>
           <label><span class="label">Frase típica</span><input type="text" id="rp-${id}" value="${esc(p.phrase||'')}" placeholder="Ej.: Nadie baja ganando" maxlength="60" autocomplete="off"></label>
           <div class="row"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-act="editCancel">Cancelar</button></div></form>`
-        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${p.days==='vie'?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div></div></div>`;
+        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${p.days==='vie'?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${p.bday?'🎂 '+fmtBday(p.bday)+' · ':''}${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div></div></div>`;
       return `<div class="prow">${name}<div class="row">
         ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Editar</button>`}
         <button class="btn" data-act="toggleActive" data-pid="${id}">${p.active===false?'Reactivar':'Retirar'}</button>
@@ -1197,6 +1246,38 @@ function vStats(){
   </section>`;
 }
 
+
+// Solapa Cumpleaños (solo Firu y Coco): próximos cumples y el regalo de cada uno
+function vCumples(){
+  if(!puedeCumples())return `<section class="card"><p class="empty">Esta solapa es solo para quienes organizan los regalos.</p></section>`;
+  const act=sortedPlayers().filter(([,p])=>p.active!==false);
+  const con=act.filter(([,p])=>p.bday).map(([id,p])=>({id,p,...nextBday(p.bday)})).sort((a,b)=>a.days-b.days);
+  const sin=act.filter(([,p])=>!p.bday);
+  const card=x=>{
+    const rid=x.id+'_'+x.date.getFullYear(),r=S.regalos[rid]||{},parts=r.parts||{},open=ui.regOpen===rid;
+    const inn=Object.entries(parts).filter(([,v])=>v.in),asig=inn.reduce((a,[,v])=>a+(+v.amt||0),0),pag=inn.filter(([,v])=>v.paid).reduce((a,[,v])=>a+(+v.amt||0),0);
+    const edad=x.p.byear?` · cumple ${x.date.getFullYear()-x.p.byear}`:'';
+    const cuando=x.days===0?'¡hoy!':x.days===1?'mañana':`en ${x.days} días`;
+    const resumen=r.monto?`${money(r.monto)} · ${inn.length} ponen · pagado ${money(pag)}${pag<r.monto?' · falta '+money(r.monto-pag):' ✓'}`:'Sin regalo cargado';
+    let body='';
+    if(open){
+      body=`<div class="fields" style="margin-top:8px"><label><span class="label">Gasto del regalo</span><input type="text" inputmode="numeric" class="money" id="rg-m-${rid}" data-chg="regMonto" data-rid="${rid}" value="${moneyIn(r.monto)}" placeholder="$ 0"></label></div>
+        <div class="row"><button class="btn" data-act="regSplit" data-rid="${rid}" ${r.monto&&inn.length?'':'disabled'}>Dividir en partes iguales</button><span class="small muted">Asignado ${money(asig)} de ${money(r.monto||0)}</span></div>
+        <div class="reglist">${act.filter(([id])=>id!==x.id).map(([id,p])=>{const v=parts[id]||{};return `<div class="regrow ${v.in?'':'out'}">
+          <label class="chk"><input type="checkbox" data-chg="regIn" data-rid="${rid}" data-pid="${id}" ${v.in?'checked':''}>${avatar(id,22)}<span>${esc(p.name)}</span></label>
+          ${v.in?`<input type="text" inputmode="numeric" class="money" id="rg-a-${rid}-${id}" data-chg="regAmt" data-rid="${rid}" data-pid="${id}" value="${moneyIn(v.amt)}" placeholder="$ 0">
+          <button class="btn ${v.paid?'paid':''}" data-act="regPaid" data-rid="${rid}" data-pid="${id}" aria-pressed="${!!v.paid}">${v.paid?'Pagó ✓':'Debe'}</button>`:'<span></span><span></span>'}
+        </div>`}).join('')}</div>`;
+    }
+    return `<div class="cumple"><button class="cumhead" data-act="regOpen" data-rid="${rid}">${avatar(x.id,40)}<span><b>${esc(x.p.name)}</b><span class="small muted" style="display:block">🎂 ${fmtBday(x.p.bday)} · ${cuando}${edad}</span><span class="small" style="display:block">${resumen}</span></span><span class="small muted">${open?'Cerrar':'Regalo ›'}</span></button>${body}</div>`;
+  };
+  return `<section class="card" data-suit="♥"><h2>Cumpleaños</h2>
+    <p class="small muted" style="margin:0">Ordenados por el más próximo. Tocá uno para cargar el regalo: cuánto sale, quiénes ponen, cuánto cada uno y quién ya pagó.</p>
+    ${con.length?`<div class="cumples">${con.map(card).join('')}</div>`:'<p class="empty">Todavía nadie tiene el cumpleaños cargado.</p>'}
+    ${sin.length?`<p class="small muted" style="margin:0"><b>Sin fecha:</b> ${sin.map(([,p])=>esc(p.name)).join(', ')}. Se carga en Jugadores → Editar.</p>`:''}
+  </section>`;
+}
+
 // Partido vigente: el que tiene el reloj andando, si no uno ya empezado, si no el de hoy (solo de ayer en adelante,
 // así un partido viejo que quedó sin cerrar no aparece como "en juego").
 const ayer=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d)};
@@ -1239,6 +1320,7 @@ function vInicio(){
       ${g.title?`<div class="gtitle" style="color:var(--gold-hi)">${gTitle(g)}</div>`:''}
       <h2 style="color:var(--on-felt)">${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
       ${gPlace(g,'onfelt')}
+      ${cumplesAviso(g)}
       <div class="livegrid">
         <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
         <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
@@ -1254,7 +1336,7 @@ function vInicio(){
       <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
   const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
       return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
-        <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}</span></span>
+        <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}${cumplesPartido(g).length?' · 🎂 '+cumplesPartido(g).map(x=>esc(pname(x.id))).join(', '):''}</span></span>
         <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
   const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
@@ -1325,6 +1407,7 @@ function alarm(){
 function setTimer(gid,t){return Store.update('games',gid,{timer:t})}
 
 /* ---------- acciones ---------- */
+function regSave(rid,patch){const [pid,y]=rid.split('_');return S.regalos[rid]?Store.update('regalos',rid,patch):Store.set('regalos',rid,merge({pid,year:+y,monto:'',parts:{}},patch))}
 const ACT={
   tab:d=>{ui.tab=d.tab;ui.editing=null;render();scrollTo(0,0)},
   clearErr:()=>{ui.err=null;render()},
@@ -1416,6 +1499,10 @@ const ACT={
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{ui.editing=null;render()},
+  regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
+  regPaid:d=>{const v=(S.regalos[d.rid]?.parts||{})[d.pid]||{};regSave(d.rid,{parts:{[d.pid]:{paid:!v.paid}}})},
+  regSplit:d=>{const r=S.regalos[d.rid]||{},inn=Object.keys(r.parts||{}).filter(k=>r.parts[k].in);if(!r.monto||!inn.length)return;
+    const each=Math.ceil(r.monto/inn.length/1000)*1000;regSave(d.rid,{parts:Object.fromEntries(inn.map(k=>[k,{amt:each}]))})},
   gedit:(d,el,e)=>{e.preventDefault();ui.gedit=!ui.gedit;render()},
   pinClose:()=>{ui.pinFor=null;ui.pinErr=null;render()},
   pinBackdrop:(d,el,e)=>{if(e.target===el)ACT.pinClose()},
@@ -1453,6 +1540,9 @@ const CHG={
   num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v})},
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
+  regMonto:el=>{const v=digits(el.value);regSave(el.dataset.rid,{monto:v===''?'':+v})},
+  regAmt:el=>{const v=digits(el.value);regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{amt:v===''?'':+v}}})},
+  regIn:el=>{regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{in:el.checked}}})},
   gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
   dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,2);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[d[0]||'',d[1]||'']})},
@@ -1498,7 +1588,8 @@ document.addEventListener('submit',e=>{
   if(f.dataset.form==='rename'){
     const pid=f.dataset.pid,v=k=>document.getElementById(k+pid).value.trim();
     const name=v('rn-'),hand=v('rh-').toUpperCase(),phrase=v('rp-'),days=v('rd-');
-    ui.editing=null;if(name)Store.update('players',pid,{name,hand,phrase,days});else render();
+    const bd=+v('rbd-'),bm=+v('rbm-'),by=v('rby-'),bday=bd&&bm?String(bm).padStart(2,'0')+'-'+String(bd).padStart(2,'0'):'',byear=bday&&/^(19|20)\d\d$/.test(by)?+by:'';
+    ui.editing=null;if(name)Store.update('players',pid,{name,hand,phrase,days,bday,byear});else render();
   }
 });
 render();

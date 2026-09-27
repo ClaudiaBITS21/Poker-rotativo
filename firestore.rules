@@ -31,6 +31,16 @@ service cloud.firestore {
     }
     function myPid() { return get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid; }
 
+    // Cumpleaños y regalos: solo Firu (Claudia) y Coco con su PIN, o claudia@rodo.es con Google.
+    function cumpleMgr() {
+      return signedIn() && (
+        (request.auth.token.email == 'claudia@rodo.es' && request.auth.token.email_verified == true)
+        || (sessionOk() && myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd']));
+    }
+    match /regalos/{id} {
+      allow read, write: if cumpleMgr();
+    }
+
     match /config/{id} {
       allow read: if signedIn();
       allow write: if isAdmin();

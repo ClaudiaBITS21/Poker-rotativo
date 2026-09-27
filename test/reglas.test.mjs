@@ -47,6 +47,12 @@ await t('Google otro mail no es admin',updateDoc(doc(O,'games','g'),{'parts.pA.s
 await t('Google claudia agrega admin',setDoc(doc(G,'config','admins'),{emails:['otro@gmail.com'],pids:[]}),true);
 await t('otro@gmail.com ahora es admin',updateDoc(doc(O,'games','g'),{'parts.pA.st':'no',_p:'pA'}),true);
 await t('anónimo no toca admins',setDoc(doc(X,'config','admins'),{emails:['x@x.com']}),false);
+await t('A (no organizador) no ve regalos',getDoc(doc(A,'regalos','x')),false);
+await t('anónimo no escribe regalos',setDoc(doc(X,'regalos','x'),{monto:1}),false);
+await t('Firu escribe regalos',setDoc(doc(F,'regalos','x'),{monto:1000,parts:{}}),true);
+await t('Firu lee regalos',getDoc(doc(F,'regalos','x')),true);
+await t('Google claudia lee regalos',getDoc(doc(G,'regalos','x')),true);
+await t('Google otro admin NO lee regalos',getDoc(doc(O,'regalos','x')),false);
 await t('Firu resetea PIN de A',(async()=>{const b=writeBatch(F);b.delete(doc(F,'pins','pA'));b.delete(doc(F,'pinflags','pA'));await b.commit()})(),true);
 await t('A con PIN reseteado ya no cambia asistencia',updateDoc(doc(A,'games','g'),{'parts.pA.st':'come',_p:'pA'}),false);
 await t('B crea PIN nuevo para A tras el reset',newPin(B,'pA','5555'),true);
