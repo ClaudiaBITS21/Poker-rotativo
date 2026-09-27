@@ -345,6 +345,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .regmine{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
 .alias{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px dashed var(--gold-2);border-radius:10px;background:#FFF8EC}.alias .small{flex-basis:100%}.alias b{font-size:17px;word-break:break-all;flex:1}.regmine:first-of-type{border-top:0}
 .mpline{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:400}.btn.mini{min-height:26px;padding:2px 10px;font-size:12px;border-radius:8px}
+.giftlist{display:flex;flex-direction:column}.giftrow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}.giftrow:first-child{border-top:0}.giftrow .gw{display:flex;align-items:center;gap:10px;min-width:0}.giftrow.bd{flex-wrap:nowrap}.giftrow.bd .gw{flex:1}.giftrow.bd .row{flex-wrap:nowrap}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -796,11 +797,14 @@ const esMie=p=>p&&p.active!==false&&p.days!=='vie';
 const mpAlias=()=>S.regalos._mp?.alias||(me()&&S.players[me()]?.mp)||'';
 // El alias de Mercado Pago de cada jugador lo cambia solo él (con su PIN) o un administrador
 const editaMp=id=>!isFB()||isAdmin()||me()===id;
-function snoozed(rid){if(ui.snooze&&ui.snooze[rid])return true;try{return localStorage.getItem('poker.snooze.'+rid)===today()}catch{return false}}
+// "Después" vale por hoy y por jugador (en un celular compartido no le oculta el aviso a otro)
+const snoozeKey=rid=>'poker.snooze.'+me()+'.'+rid;
+function snoozed(rid){if(ui.snooze&&ui.snooze[me()+'.'+rid])return true;try{return localStorage.getItem(snoozeKey(rid))===today()}catch{return false}}
+function snooze(rid){try{localStorage.setItem(snoozeKey(rid),today())}catch{}ui.snooze={...(ui.snooze||{}),[me()+'.'+rid]:1}}
 // Cumpleaños de los miércoles en las próximas 3 semanas que este jugador todavía no contestó
 function giftPending(){
-  const m=me();if(!m||!esMie(S.players[m]))return null;
-  if(isFB()&&!ui.rpReady)return null;
+  const m=me();if(!m||!esMie(S.players[m]))return [];
+  if(isFB()&&!ui.rpReady)return [];
   const out=[];
   for(const [id,p] of Object.entries(S.players)){
     if(id===m||!p.bday||!esMie(p))continue;
@@ -809,7 +813,7 @@ function giftPending(){
     if(S.regpart[rid+'__'+m]?.resp||snoozed(rid))continue;
     out.push({id,rid,...n});
   }
-  return out.sort((a,b)=>a.days-b.days)[0]||null;
+  return out.sort((a,b)=>a.days-b.days);
 }
 // Regalos en los que estás anotado, con fecha y nombre del cumpleañero (hasta 30 días después del cumple)
 function misRegalos(){
@@ -824,30 +828,47 @@ function misRegalos(){
 const aliasBox=a=>a?`<div class="alias"><span class="small muted">Alias de Mercado Pago</span><b>${esc(a)}</b><button class="btn" data-act="copyAlias" data-v="${esc(a)}">${ui.copied===a?'Copiado ✓':'Copiar'}</button></div>`:'';
 // Ya se definió cuánto pone y todavía no dijo cómo paga
 function renderPay(w){
-  const g=misRegalos().find(({x})=>x.amt&&!x.paid&&!x.pay&&!snoozed('pay.'+x.rid));if(!g)return false;
-  const {x,p}=g;
-  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Pago del regalo">
-    <h2>🎁 Regalo para ${esc(p.name)}</h2>
-    <p style="margin:0">Ya se definió el regalo: te toca poner <b style="font-size:20px">${money(x.amt)}</b>.</p>
-    ${aliasBox(x.alias)}
-    <div class="row" style="gap:8px;margin-top:12px">
-      <button class="btn pri" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button>
-      <button class="btn" data-act="giftPay" data-v="partido" data-rid="${x.rid}">Pago en el partido</button>
-      <button class="btn" style="color:var(--muted)" data-act="giftPayLater" data-rid="${x.rid}">Después</button>
+  const list=misRegalos().filter(({x})=>x.amt&&!x.paid&&!x.pay&&!snoozed('pay.'+x.rid));if(!list.length)return false;
+  const rids=list.map(({x})=>x.rid).join(',');
+  const botones=x=>`<button class="btn pri" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button>
+      <button class="btn" data-act="giftPay" data-v="partido" data-rid="${x.rid}">Pago en el partido</button>`;
+  const alias=[...new Set(list.map(({x})=>x.alias||''))];
+  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Pago de regalos">
+    ${list.length===1
+      ?`<h2>🎁 Regalo para ${esc(list[0].p.name)}</h2>
+    <p style="margin:0">Ya se definió el regalo: te toca poner <b style="font-size:20px">${money(list[0].x.amt)}</b>.</p>
+    ${aliasBox(list[0].x.alias)}
+    <div class="row" style="gap:8px;margin-top:12px">${botones(list[0].x)}`
+      :`<h2>🎁 Regalos para pagar</h2>
+    <p style="margin:0">Ya se definieron ${list.length} regalos. Total: <b>${money(list.reduce((a,{x})=>a+(+x.amt||0),0))}</b>.</p>
+    ${alias.length===1?aliasBox(alias[0]):''}
+    <div class="giftlist">${list.map(({x,p,d})=>`<div class="giftrow"><div class="gw">${avatar(x.rid.slice(0,x.rid.lastIndexOf('_')),36)}<div><b>${esc(p.name)}</b> · <b>${money(x.amt)}</b><div class="small muted">cumple ${d.getDate()} ${MESES[d.getMonth()]}${alias.length>1&&x.alias?' · MP: '+esc(x.alias):''}</div></div></div>
+      <div class="row" style="gap:6px">${botones(x)}</div></div>`).join('')}</div>
+    <div class="row" style="gap:8px;margin-top:4px">`}
+      <button class="btn" style="color:var(--muted)" data-act="giftPayLater" data-rid="${rids}">Después</button>
     </div></section></div>`;
   return true;
 }
 function renderGift(w){
   if(renderPay(w))return true;
-  const g=giftPending();if(!g)return false;
-  const cu=g.days===0?'hoy':g.days===1?'mañana':'el '+g.date.getDate()+' de '+MESES[g.date.getMonth()]+' (en '+g.days+' días)';
-  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Regalo de cumpleaños">
-    <h2>🎁 Regalo para ${esc(pname(g.id))}</h2>
-    <div class="avprev">${avatar(g.id,64)}<div>${esc(pname(g.id))} cumple ${cu}. ¿Querés participar del regalo?<div class="small muted" style="margin-top:4px">${esc(pname(g.id))} no ve este aviso. El monto que te toca lo vas a ver en Inicio cuando se defina.</div></div></div>
+  const list=giftPending();if(!list.length)return false;
+  const cu=g=>g.days===0?'hoy':g.days===1?'mañana':'el '+g.date.getDate()+' de '+MESES[g.date.getMonth()]+' (en '+g.days+' días)';
+  const rids=list.map(g=>g.rid).join(',');
+  const g=list[0];
+  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Regalos de cumpleaños">
+    ${list.length===1
+      ?`<h2>🎁 Regalo para ${esc(pname(g.id))}</h2>
+    <div class="avprev">${avatar(g.id,64)}<div>${esc(pname(g.id))} cumple ${cu(g)}. ¿Querés participar del regalo?<div class="small muted" style="margin-top:4px">${esc(pname(g.id))} no ve este aviso. El monto que te toca lo vas a ver en Inicio cuando se defina.</div></div></div>
     <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn pri" data-act="giftYes" data-rid="${g.rid}">Sí, participo</button>
-      <button class="btn" data-act="giftNo" data-rid="${g.rid}">No esta vez</button>
-      <button class="btn" style="color:var(--muted)" data-act="giftLater" data-rid="${g.rid}">Después</button>
+      <button class="btn" data-act="giftNo" data-rid="${g.rid}">No esta vez</button>`
+      :`<h2>🎁 Regalos de cumpleaños</h2>
+    <p style="margin:0">Hay ${list.length} cumpleaños en las próximas 3 semanas. Elegí en cuáles participás:</p>
+    <div class="giftlist">${list.map(g=>`<div class="giftrow bd"><div class="gw">${avatar(g.id,36)}<div><b>${esc(pname(g.id))}</b><div class="small muted">cumple ${cu(g)}</div></div></div>
+      <div class="row" style="gap:6px"><button class="btn pri" data-act="giftYes" data-rid="${g.rid}">Sí</button><button class="btn" data-act="giftNo" data-rid="${g.rid}">No</button></div></div>`).join('')}</div>
+    <p class="small muted" style="margin:0">Los cumpleañeros no ven este aviso. El monto que te toca lo vas a ver en Inicio cuando se defina.</p>
+    <div class="row" style="gap:8px">`}
+      <button class="btn" style="color:var(--muted)" data-act="giftLater" data-rid="${rids}">Después</button>
     </div></section></div>`;
   return true;
 }
@@ -1835,11 +1856,11 @@ const ACT={
   regSplit:d=>{const r=S.regalos[d.rid]||{},ps=partsOf(d.rid),inn=Object.keys(ps).filter(k=>ps[k].in);if(!r.monto||!inn.length)return;
     const each=Math.ceil(r.monto/inn.length/1000)*1000;inn.forEach(k=>rpSave(d.rid,k,{amt:each,alias:mpAlias()}))},
   giftPay:d=>{rpSave(d.rid,me(),{pay:d.v,payAt:Date.now()})},
-  giftPayLater:d=>{try{localStorage.setItem('poker.snooze.pay.'+d.rid,today())}catch{}ui.snooze={...(ui.snooze||{}),['pay.'+d.rid]:1};render()},
+  giftPayLater:d=>{d.rid.split(',').forEach(r=>snooze('pay.'+r));render()},
   copyAlias:d=>{const ok=()=>{ui.copied=d.v;render();setTimeout(()=>{ui.copied=null;render()},2000)};try{navigator.clipboard.writeText(d.v).then(ok,()=>prompt('Copiá el alias:',d.v))}catch{prompt('Copiá el alias:',d.v)}},
   giftYes:d=>{rpSave(d.rid,me(),{in:true,resp:true,at:Date.now()})},
   giftNo:d=>{rpSave(d.rid,me(),{in:false,resp:true,at:Date.now()})},
-  giftLater:d=>{try{localStorage.setItem('poker.snooze.'+d.rid,today())}catch{}ui.snooze={...(ui.snooze||{}),[d.rid]:1};render()},
+  giftLater:d=>{d.rid.split(',').forEach(snooze);render()},
   gedit:(d,el,e)=>{e.preventDefault();ui.gedit=!ui.gedit;render()},
   pinClose:()=>{ui.pinFor=null;ui.pinErr=null;render()},
   pinBackdrop:(d,el,e)=>{if(e.target===el)ACT.pinClose()},
