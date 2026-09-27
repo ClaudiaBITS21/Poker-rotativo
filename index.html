@@ -553,7 +553,9 @@ const APPBASE=RAIZ?location.origin+'/':PAGES&&SEG[0]?location.origin+'/'+SEG[0]+
 const PSEG=RAIZ?SEG[0]:PAGES?SEG[1]:'';
 const TID=(new URLSearchParams(location.search).get('t')||(PSEG&&!PSEG.includes('.')?PSEG:'')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
 const tourLink=tid=>APPBASE?APPBASE+tid:location.origin+location.pathname+'?t='+tid;
-if(APPBASE){try{const q=new URLSearchParams(location.search);q.delete('t');history.replaceState(null,'',APPBASE+TID+(q.toString()?'?'+q:'')+location.hash)}catch{}}
+// poker.rodo.es sin torneo = pantalla de administración (solo la dueña); cada torneo va con su link
+const ADMIN_HOME=(!!APPBASE&&!new URLSearchParams(location.search).get('t')&&!(PSEG&&!PSEG.includes('.')))||(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&new URLSearchParams(location.search).has('admin'));
+if(APPBASE){try{const q=new URLSearchParams(location.search);q.delete('t');history.replaceState(null,'',APPBASE+(ADMIN_HOME?'':TID)+(q.toString()?'?'+q:'')+location.hash)}catch{}}
 // Lugar por defecto de las partidas de este torneo (cada partida lo puede cambiar)
 const LUGAR={place:'Eduardo Acevedo 29',map:'https://maps.app.goo.gl/UN5vwaNmuBCdKpTc6'}; // se reemplaza por el del torneo
 // update() de Firestore reemplaza los mapas enteros: se pasa a rutas con puntos ("parts.p1.st") para mezclar como antes.
@@ -581,10 +583,16 @@ const FB={
     this.unsub.push(m.onSnapshot(m.doc(this.db,'tournaments',TID),d=>{ui.tour=d.exists()?d.data():null;ui.tourLoaded=true;applyTour();this.gate()},e=>{ui.tourLoaded=true;ui.err=e.code==='permission-denied'?'El torneo todavía no está listo: la organizadora está terminando de configurarlo. Probá de nuevo en un rato.':'No se pudo abrir el torneo ('+e.code+').';this.gate()}));
     // solo cuenta lo que confirmó el servidor (una clave o un PIN incorrectos se ven un instante antes de ser rechazados)
     this.unsub.push(m.onSnapshot(m.doc(this.db,'members',TID+'_'+this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.memberV=d.exists()?d.data().v:null;this.gate()},()=>{ui.memberV=null;this.gate()}));
-    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.session=d.exists()?d.data().pid:null;this.gate();this.watchRegalos();this.watchOwner()},()=>{ui.session=null;this.gate()}));
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.session=d.exists()?d.data().pid:null;ui.sessLoaded=true;this.gate();this.watchRegalos();this.watchOwner()},()=>{ui.session=null;ui.sessLoaded=true;this.gate()}));
   },
   // Entra al torneo quien puso la clave vigente (o la dueña)
   gate(){
+    if(ADMIN_HOME&&!isOwner()){
+      // en la pantalla de administración no se entra a ningún torneo; si este celular ya jugó en uno, se lo manda ahí
+      ui.gate=ui.sessLoaded?'admin':'wait';if(this.dataOn)this.stopData();ui.loaded=true;
+      if(ui.sessLoaded&&!ui.redirTried){ui.redirTried=true;const m=this.m;m.getDoc(m.doc(this.db,'memberOf',this.user.uid)).then(d=>{if(d.exists()&&d.data().tid&&!isOwner())location.replace(tourLink(d.data().tid))}).catch(()=>{})}
+      render();return;
+    }
     const ok=isOwner()||!!(ui.tour&&ui.memberV!=null&&ui.memberV===ui.tour.keyV);
     ui.gate=!ui.tourLoaded?'wait':ok?'ok':!ui.tour?'missing':'key';
     if(ok&&!this.dataOn)this.startData();else if(!ok&&this.dataOn)this.stopData();
@@ -913,7 +921,7 @@ function applyTour(){
   for(const [k,v] of Object.entries(src))TYPES[k]={...(TYPES0[k]||{}),...JSON.parse(JSON.stringify(v)),rb:v.rb||(TYPES0[k]&&TYPES0[k].rb)||'una'};
   if(!TYPES[ui.newType])ui.newType=typeKeys()[0];
   if(t.place!=null)LUGAR.place=t.place;if(t.map!=null)LUGAR.map=t.map;
-  document.title='Torneo '+tourName();
+  document.title=ADMIN_HOME?'Administración · Torneos':'Torneo '+tourName();
 }
 // Puntos de la liga anterior: dentro del torneo (Firebase) o en el jugador (claude.ai)
 const prevOf=p=>isFB()?(p.ts&&p.ts[TID]&&p.ts[TID].prev):p.prev;
@@ -1047,13 +1055,14 @@ function render(){
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
   if(soloVie()){if(ui.tab==='stats')ui.tab='inicio';ui.newType='vie'}
   if(ui.tab==='cumples'&&!puedeCumples())ui.tab='inicio';
-  $('#tname').textContent=tourName();
+  $('#tname').textContent=ADMIN_HOME?'Administración':tourName();
   const gated=isFB()&&ui.gate!=='ok';
+  if(ADMIN_HOME&&isOwner())ui.tab='admin';
   if(ui.tab==='admin'&&!isOwner())ui.tab='inicio';
-  $('#tabs').innerHTML=gated?'':[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[]),...(isOwner()?[['admin','⚙️']]:[])]
+  $('#tabs').innerHTML=gated||ADMIN_HOME?'':[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[]),...(isOwner()?[['admin','⚙️']]:[])]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
-  $('#me').innerHTML=!ui.loaded||gated?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
+  $('#me').innerHTML=!ui.loaded||gated||ADMIN_HOME?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
     :sortedPlayers().length?`<select class="mesel" id="me-sel" data-chg="me" aria-label="Quién sos"><option value="">¿Quién sos?</option>${sortedPlayers().filter(([,p])=>p.active!==false).map(([id,p])=>`<option value="${id}">${esc(p.name)}${lock(id)}</option>`).join('')}</select>`:'';
   $('#adminbar').innerHTML=!isFB()?'':ui.fbEmail?`<span>${isAdmin()?'Administradora':'Sin permisos de administrador'}: ${esc(ui.fbEmail)} · <button class="linkbtn" data-act="adminOut">salir</button></span>`
     :`<button class="linkbtn" data-act="adminIn">Entrar como administradora</button>`;
@@ -1613,7 +1622,7 @@ function vPanel(){
     const open=ui.tourOpen===tid,n=allP.filter(([,p])=>p.ts&&p.ts[tid]).length,dev=mem.filter(x=>x.tid===tid&&x.v===t.keyV).length;
     return `<div class="tour ${tid===TID?'cur':''}">
       <button class="cumhead" data-act="tourOpen" data-v="${tid}"><span class="av" style="width:40px;height:40px">${chipSvg(CHIPC[0],'♠')}</span>
-        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${t.open?'sin clave: entra cualquiera con el link':dev+' celulares entraron con la clave'}</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
+        <span><b>${esc(t.name||tid)}</b>${tid===TID&&!ADMIN_HOME?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${t.open?'sin clave: entra cualquiera con el link':dev+' celulares entraron con la clave'}</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
         <span class="small muted">${open?'Cerrar':'Editar ›'}</span></button>
       ${open?`<div class="tbody">
         <div class="row"><button class="btn" data-act="copyLink" data-v="${esc(link(tid))}">Copiar link</button><a class="btn" href="${esc(link(tid))}">Abrir</a></div>
@@ -1634,7 +1643,7 @@ function vPanel(){
   const users=uP.map(([pid,p])=>{const ss=ses.filter(x=>x.pid===pid),last=Math.max(0,...ss.map(x=>x.at||0));
     return `<tr><td><span class="who">${avatar(pid,22)}${esc(p.name)}</span></td><td>${ui.pinflags&&ui.pinflags.has(pid)?'🔒 '+fdate(ui.pinAt&&ui.pinAt[pid]):'<span class="muted">sin PIN</span>'}</td><td class="r">${ss.length||''}</td><td>${ss.length?fdate(last):''}</td><td class="small">${Object.keys(p.ts||{}).map(t=>esc((tours[t]&&tours[t].name)||t)).join(', ')}</td></tr>`}).join('');
   const conPin=uP.filter(([pid])=>ui.pinflags&&ui.pinflags.has(pid)).length;
-  const nuevoOpen=ui.tourNewOpen||!tours[TID];
+  const nuevoOpen=ui.tourNewOpen||(!ADMIN_HOME&&!tours[TID]);
   const nuevo=nuevoOpen?`<form data-form="tourNew" class="edit">
       <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="amigos-club" maxlength="40" value="${tours[TID]?'':esc(TID)}"></label>
       <label><span class="label">Clave para entrar (opcional)</span><input type="text" id="tn-key" autocomplete="off" placeholder="vacío = entra cualquiera con el link"></label>
@@ -1647,7 +1656,7 @@ function vPanel(){
     ${nuevo}
   </section>`:''}
   <section class="card" data-suit="♠"><div class="row spread"><h2>Torneos vigentes</h2>${nuevoOpen?'':'<button class="btn pri" data-act="tourNewToggle">＋ Nuevo torneo</button>'}</div>
-    ${tours[TID]?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo en "Nuevo torneo" con el link <b>${esc(TID)}</b>.</div>`}
+    ${tours[TID]||ADMIN_HOME?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo en "Nuevo torneo" con el link <b>${esc(TID)}</b>.</div>`}
     ${Object.keys(tours).length?`<div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>`:'<p class="empty">Todavía no hay torneos.</p>'}
   </section>
   <section class="card r" data-suit="♥"><h2>Usuarios</h2>
@@ -1660,6 +1669,10 @@ function vPanel(){
 // Pantalla de entrada al torneo: la primera vez, cada celular pone la clave que da la dueña.
 function vGate(){
   if(ui.gate==='wait')return `<div class="card empty">Mezclando las cartas…</div>`;
+  if(ui.gate==='admin')return `<section class="card" data-suit="♠"><h2>Administración de torneos</h2>
+    <p style="margin:0">Esta página es solo para quien organiza.</p>
+    <p class="muted" style="margin:0">Si venís a jugar, entrá con el link de tu torneo (por ejemplo <b>poker.rodo.es/rotativo</b>). Si no lo tenés, pedíselo a quien organiza.</p>
+    ${ui.fbEmail?'':'<div class="row"><button class="btn pri" data-act="adminIn">Entrar como administradora</button></div>'}</section>`;
   if(ui.gate==='missing')return vPortada()+`<section class="card" data-suit="♠"><h2>Este torneo no existe</h2>
     <p class="muted" style="margin:0">Revisá el link que te pasaron.${ui.fbEmail?'':' Si sos la organizadora, entrá como administradora (abajo de todo) para crearlo.'}</p></section>`;
   if(ui.tour&&ui.tour.open)return vPortada()+`<section class="card"><p class="empty">Entrando al torneo…</p></section>`;
