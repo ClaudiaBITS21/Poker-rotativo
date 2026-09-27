@@ -1654,7 +1654,7 @@ function handName(sc){
   if(c===7)return 'póker de '+PLUR[x];
   if(c===6)return 'full de '+PLUR[x]+' y '+PLUR[y];
   if(c===3)return 'trío de '+PLUR[x];
-  if(c===2)return 'doble par, '+PLUR[x]+' y '+PLUR[y];
+  if(c===2)return 'doble par de '+PLUR[x]+' y '+PLUR[y];
   if(c===1)return 'par de '+PLUR[x];
   if(c===0)return 'carta alta';
   return CATS[c].toLowerCase();
@@ -1697,10 +1697,9 @@ function vPortada(){
       <rect x="72" y="114" width="216" height="62" rx="31" fill="#92342A" fill-opacity=".55" stroke="url(#gd)" stroke-width="2"/>
       ${chips(48,['#1B1713','#C1272D','#1F4FA8','#1B1713'])}${chips(312,['#17744B','#1B1713','#C1272D'])}
       ${b.map((c,i)=>card(xs[i],c)).join('')}
-      ${cap?`<text x="180" y="108" text-anchor="middle" font-family="Figtree,system-ui,sans-serif" font-weight="600" font-size="9" fill="#FAE8B4" stroke="#3D0B08" stroke-width="2" paint-order="stroke">${cap}</text>`:''}
       ${seats}
     </svg>
-    <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${soloVie()?esc(TYPES.vie.name):esc(tourSub())}</span></div>
+    <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${cap||(soloVie()?esc(TYPES.vie.name):esc(tourSub()))}</span></div>
   </section>`;
 }
 function vInicio(){
