@@ -2140,10 +2140,14 @@ document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
   // si el formulario se aceptó (no apareció un error nuevo), lo escrito ya no es borrador
   const e0=ui.err;setTimeout(()=>{if(!ui.err||ui.err===e0)clearDrafts(f)});
+  // El nombre de cada jugador es único en toda la plataforma (sin importar mayúsculas, acentos ni espacios)
+  const nameKey=v=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const nameTaken=(name,except)=>Object.entries({...(ui.allPlayers||{}),...S.players}).find(([id,p])=>id!==except&&p.name&&nameKey(p.name)===nameKey(name));
+  const takenMsg=(name,t)=>'Ya existe un jugador llamado '+t[1].name+(S.players[t[0]]?' en este torneo. Buscalo en la lista.':' en otro torneo. Si es la misma persona, pedile a la organizadora que lo sume a este torneo; si no, usá otro nombre (por ejemplo con la inicial del apellido).');
   if(f.dataset.form==='addPlayerGame'){
     // jugador nuevo desde la partida: se suma al torneo y, si se puede, queda anotado como que juega
     const inp=$('#npg-name'),name=inp.value.trim();if(!name)return;
-    if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'. Buscalo en la lista.';render();return}
+    {const t=nameTaken(name);if(t){ui.err=takenMsg(name,t);render();return}}
     const [gid]=currentGame(),nid=uid('p');ui.addingP=false;
     Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now(),...(isFB()?{ts:{[TID]:{}}}:{})}).then(()=>{
       if(!isFB()||isAdmin()){Store.update('games',gid,{parts:{[nid]:{st:'juega'}}});return}
@@ -2153,7 +2157,7 @@ document.addEventListener('submit',e=>{
   }
   if(f.dataset.form==='addPlayer'){
     const inp=$('#np-name'),name=inp.value.trim();if(!name)return;
-    if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'.';render();return}
+    {const t=nameTaken(name);if(t){ui.err=takenMsg(name,t);render();return}}
     inp.value='';const nid=uid('p');Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now(),...(isFB()?{ts:{[TID]:{}}}:{})}).then(()=>{
       // en la versión pública, al crear un jugador se le propone crear su PIN (se puede cancelar si lo cargó otro)
       if(isFB()&&!me()){ui.pinFor=nid;ui.pinErr=null;render();return}const i=$('#np-name');i&&i.focus()});
@@ -2213,6 +2217,7 @@ document.addEventListener('submit',e=>{
     if(fb&&(!mt||+mt[1]<1||+mt[1]>31||+mt[2]<1||+mt[2]>12)){ui.err='El cumpleaños va como dd/mm/aaaa (el año es opcional), por ejemplo 12/03/1975.';render();return}
     const bday=mt?String(+mt[2]).padStart(2,'0')+'-'+String(+mt[1]).padStart(2,'0'):'',byear=mt&&mt[3]?+mt[3]:'';
     const extra=editaMp(pid)?{mp:v('rm-')}:{};
+    {const t=name&&nameTaken(name,pid);if(t){ui.err=takenMsg(name,t);render();return}}
     ui.editing=null;if(name)savePlayer(pid,{name,hand,phrase,days,bday,byear,...extra});else render();
   }
 });
