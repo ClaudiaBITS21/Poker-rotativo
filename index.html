@@ -348,6 +348,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .alias{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px dashed var(--gold-2);border-radius:10px;background:#FFF8EC}.alias .small{flex-basis:100%}.alias b{font-size:17px;word-break:break-all;flex:1}.regmine:first-of-type{border-top:0}
 .mpline{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:400}.btn.mini{min-height:26px;padding:2px 10px;font-size:12px;border-radius:8px}
 .giftlist{display:flex;flex-direction:column}.giftrow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}.giftrow:first-child{border-top:0}.giftrow .gw{display:flex;align-items:center;gap:10px;min-width:0}.giftrow.bd{flex-wrap:nowrap}.giftrow.bd .gw{flex:1}.giftrow.bd .row{flex-wrap:nowrap}
+a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .ufseg{display:flex;flex-wrap:wrap;gap:6px}.ufseg button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;min-height:32px}.ufseg button[aria-pressed="true"]{background:var(--felt-2);border-color:var(--felt-2);color:#FBEBD2}.ufseg button[aria-pressed="true"] .muted{color:#E8C9B8}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
@@ -553,6 +554,10 @@ const APPBASE=RAIZ?location.origin+'/':PAGES&&SEG[0]?location.origin+'/'+SEG[0]+
 const PSEG=RAIZ?SEG[0]:PAGES?SEG[1]:'';
 const TID=(new URLSearchParams(location.search).get('t')||(PSEG&&!PSEG.includes('.')?PSEG:'')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
 const tourLink=tid=>APPBASE?APPBASE+tid:location.origin+location.pathname+'?t='+tid;
+// Torneos a los que entró este celular (para elegir en poker.rodo.es)
+function misTorneos(){try{return JSON.parse(localStorage.getItem('poker.tours')||'[]')}catch{return []}}
+function recordarTorneo(tid,name){try{const l=misTorneos().filter(x=>x.tid!==tid);l.unshift({tid,name});localStorage.setItem('poker.tours',JSON.stringify(l.slice(0,10)))}catch{}}
+const normTid=v=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').slice(0,40);
 // poker.rodo.es sin torneo = pantalla de administración (solo la dueña); cada torneo va con su link
 const ADMIN_HOME=(!!APPBASE&&!new URLSearchParams(location.search).get('t')&&!(PSEG&&!PSEG.includes('.')))||(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&new URLSearchParams(location.search).has('admin'));
 if(APPBASE){try{const q=new URLSearchParams(location.search);q.delete('t');history.replaceState(null,'',APPBASE+(ADMIN_HOME?'':TID)+(q.toString()?'?'+q:'')+location.hash)}catch{}}
@@ -589,12 +594,19 @@ const FB={
   gate(){
     if(ADMIN_HOME&&!isOwner()){
       // en la pantalla de administración no se entra a ningún torneo; si este celular ya jugó en uno, se lo manda ahí
-      ui.gate=ui.sessLoaded?'admin':'wait';if(this.dataOn)this.stopData();ui.loaded=true;
-      if(ui.sessLoaded&&!ui.redirTried){ui.redirTried=true;const m=this.m;m.getDoc(m.doc(this.db,'memberOf',this.user.uid)).then(d=>{if(d.exists()&&d.data().tid&&!isOwner())location.replace(tourLink(d.data().tid))}).catch(()=>{})}
+      // si ya entró a un solo torneo, va directo; si entró a varios, elige
+      if(this.dataOn)this.stopData();ui.loaded=true;
+      if(!ui.sessLoaded){ui.gate='wait';render();return}
+      if(!ui.redirTried){ui.redirTried=true;ui.gate='wait';const m=this.m,known=misTorneos();
+        m.getDoc(m.doc(this.db,'memberOf',this.user.uid)).then(d=>{if(d.exists()&&d.data().tid&&!known.some(x=>x.tid===d.data().tid))known.push({tid:d.data().tid,name:d.data().tid})}).catch(()=>{})
+          .then(()=>{ui.known=known;if(known.length===1&&!isOwner()){location.replace(tourLink(known[0].tid));return}ui.gate='admin';render()});
+        render();return}
+      if(ui.gate!=='wait')ui.gate='admin';
       render();return;
     }
     const ok=isOwner()||!!(ui.tour&&ui.memberV!=null&&ui.memberV===ui.tour.keyV);
     ui.gate=!ui.tourLoaded?'wait':ok?'ok':!ui.tour?'missing':'key';
+    if(!ADMIN_HOME&&ui.tour&&ui.memberV!=null&&ui.memberV===ui.tour.keyV)recordarTorneo(TID,tourName());
     if(ok&&!this.dataOn)this.startData();else if(!ok&&this.dataOn)this.stopData();
     // torneo sin clave: alcanza con tener el link (se entra con la clave vacía)
     if(ui.gate==='key'&&ui.tour.open&&ui.autoJoin!==ui.tour.keyV){ui.autoJoin=ui.tour.keyV;this.join('').catch(e=>{ui.err='No se pudo entrar al torneo ('+e.code+').';render()})}
@@ -1669,10 +1681,11 @@ function vPanel(){
 // Pantalla de entrada al torneo: la primera vez, cada celular pone la clave que da la dueña.
 function vGate(){
   if(ui.gate==='wait')return `<div class="card empty">Mezclando las cartas…</div>`;
-  if(ui.gate==='admin')return `<section class="card" data-suit="♠"><h2>Administración de torneos</h2>
-    <p style="margin:0">Esta página es solo para quien organiza.</p>
-    <p class="muted" style="margin:0">Si venís a jugar, entrá con el link de tu torneo (por ejemplo <b>poker.rodo.es/rotativo</b>). Si no lo tenés, pedíselo a quien organiza.</p>
-    ${ui.fbEmail?'':'<div class="row"><button class="btn pri" data-act="adminIn">Entrar como administradora</button></div>'}</section>`;
+  if(ui.gate==='admin'){const k=ui.known||[];return `<section class="card" data-suit="♠"><h2>¿A qué torneo vas?</h2>
+    ${k.length?`<div class="label">Tus torneos</div><div class="ufseg">${k.map(x=>`<a class="btn" href="${esc(tourLink(x.tid))}">${esc(x.name||x.tid)}</a>`).join('')}</div><div class="label" style="margin-top:4px">U otro</div>`:''}
+    <form data-form="goTour" class="row"><input type="text" id="gt" placeholder="Nombre del torneo (ej.: rotativo)" autocomplete="off" autocapitalize="none" spellcheck="false" style="flex:1;min-width:180px"><button class="btn pri" type="submit">Ir</button></form>
+    ${ui.gtErr?`<div class="err">${esc(ui.gtErr)}</div>`:''}
+    <p class="small muted" style="margin:0">Es el nombre que va en el link del torneo (poker.rodo.es/<b>rotativo</b>). Si no lo sabés, pedíselo a quien organiza.</p></section>`}
   if(ui.gate==='missing')return vPortada()+`<section class="card" data-suit="♠"><h2>Este torneo no existe</h2>
     <p class="muted" style="margin:0">Revisá el link que te pasaron.${ui.fbEmail?'':' Si sos la organizadora, entrá como administradora (abajo de todo) para crearlo.'}</p></section>`;
   if(ui.tour&&ui.tour.open)return vPortada()+`<section class="card"><p class="empty">Entrando al torneo…</p></section>`;
@@ -2153,6 +2166,12 @@ document.addEventListener('submit',e=>{
     if(!k&&(t.open||!confirm('¿Sacarle la clave? Va a poder entrar cualquiera que tenga el link.')))return;
     // al poner clave a un torneo abierto, se le pide a todos (sube keyV)
     FB.saveTour(tid,k?{open:false,...(t.open?{keyV:(t.keyV||1)+1}:{})}:{open:true},k).then(()=>{alert(!k?'Listo: ahora entra cualquiera con el link.':t.open?'Clave puesta: todos la van a tener que poner.':'Clave cambiada. Los que ya entraron siguen adentro; si querés que la vuelvan a poner, tocá "Pedir la clave de nuevo".');render()}).catch(fail);
+    return;
+  }
+  if(f.dataset.form==='goTour'){
+    const tid=normTid((document.getElementById('gt')||{}).value||'');if(!tid)return;
+    const m=FB.m;ui.gtErr=null;
+    m.getDoc(m.doc(FB.db,'tournaments',tid)).then(d=>{if(d.exists())location.href=tourLink(tid);else{ui.gtErr='No encontramos el torneo "'+tid+'". Revisá cómo se escribe.';render()}}).catch(e=>{ui.gtErr='No se pudo buscar ('+(e.code||e.message)+').';render()});
     return;
   }
   if(f.dataset.form==='join'){
