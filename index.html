@@ -298,6 +298,13 @@ tfoot td{font-weight:700;border-bottom:0}
 .mc{display:inline-flex;align-items:center;gap:1px;height:18px;min-width:17px;padding:0 3px;border-radius:3px;background:#FFFDF7;border:1px solid #CFC6B4;color:#1B1713;font-family:var(--num);font-weight:600;font-size:11px;line-height:1;box-shadow:0 1px 1px rgba(0,0,0,.25);font-style:normal}
 .mc i{font-style:normal;font-size:10px}
 .mc.red{color:#C1272D}
+.gtitle{font-family:var(--show);font-size:22px;line-height:1.1;color:var(--felt)}
+.gtitle.sm{display:block;font-size:16px}
+.place{font-size:14px;color:var(--muted)}
+.place a{color:var(--felt);font-weight:700}
+.place.onfelt{color:var(--on-felt-mut)}.place.onfelt a{color:var(--gold-hi)}
+.gedit summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--muted)}
+.gedit .fields{margin-top:8px}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -459,6 +466,8 @@ const FIREBASE={apiKey:"AIzaSyC5TffA6ZDcNw2OJRiimsdTjzV2yqgXc1A",authDomain:"pok
   storageBucket:"poker-rotativo.firebasestorage.app",messagingSenderId:"518862049014",appId:"1:518862049014:web:b00d16ff6f463dd6aee6d7"};
 const FBV='https://www.gstatic.com/firebasejs/10.14.1/';
 const OWNER='claudia@rodo.es';
+// Lugar por defecto de las partidas de este torneo (cada partida lo puede cambiar)
+const LUGAR={place:'Eduardo Acevedo 29',map:'https://maps.app.goo.gl/UN5vwaNmuBCdKpTc6'};
 // update() de Firestore reemplaza los mapas enteros: se pasa a rutas con puntos ("parts.p1.st") para mezclar como antes.
 // El avatar sí se reemplaza entero (si no, quedan restos de otro tipo de avatar).
 function flatten(o,pre='',out={}){for(const [k,v] of Object.entries(o)){const key=pre+k;if(v&&typeof v==='object'&&!Array.isArray(v)&&k!=='av'&&Object.keys(v).length)flatten(v,key+'.',out);else out[key]=v}return out}
@@ -577,6 +586,11 @@ const today=()=>ymd(new Date());
 const fmtDate=s=>{if(!s)return '';const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})};
 const blind=i=>{const s=BLINDS[Math.min(i,BLINDS.length-1)];return s+'-'+s*2};
 const pname=id=>S.players[id]?.name||'(borrado)';
+const gTitle=g=>g.title?esc(g.title):'';
+const safeUrl=u=>/^https:\/\/[^\s"'<>]+$/.test(u||'')?u:'';
+// "📍 Eduardo Acevedo 29 · Cómo llegar" (el link abre Google Maps)
+const gPlace=(g,cls='')=>{const pl=g.place??LUGAR.place,u=safeUrl(g.map??LUGAR.map)||(pl?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(pl):'');
+  return pl?`<span class="place ${cls}">📍 ${esc(pl)}${u?` · <a href="${esc(u)}" target="_blank" rel="noopener">Cómo llegar</a>`:''}</span>`:''};
 // mano favorita y frase típica, en chiquito entre paréntesis al lado del nombre
 function handCards(h){
   const r=String(h||'').toUpperCase().replace(/10/g,'T').match(/[AKQJT2-9]/g);if(!r||r.length<2)return '';
@@ -816,8 +830,15 @@ function vGame(gid,g){
       <div class="row"><span class="badge ${g.type}">${t.name}</span>${closed?'<span class="badge gold">Cerrada</span>':g.date>today()?'<span class="badge gold">Programada</span>':''}</div>
       ${closed?'':`<button class="btn" data-act="goResult">Terminar partida ↓</button>`}
     </div>
+    ${g.title?`<div class="gtitle">${gTitle(g)}</div>`:''}
     <h2>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
+    ${gPlace(g)}
     <div class="row"><input type="date" id="g-date" data-chg="date" value="${esc(g.date)}" ${closed?'disabled':''} aria-label="Fecha"><input type="time" id="g-time" data-chg="time" value="${esc(g.time||'')}" ${closed?'disabled':''} aria-label="Hora"></div>
+    ${closed?'':`<details class="gedit" ${ui.gedit?'open':''}><summary data-act="gedit">Nombre y lugar</summary><div class="fields">
+      <label><span class="label">Nombre (opcional)</span><input type="text" id="g-title" data-chg="gtext" data-k="title" value="${esc(g.title||'')}" placeholder="Ej.: Cumple de Coco" maxlength="60"></label>
+      <label><span class="label">Dirección</span><input type="text" id="g-place" data-chg="gtext" data-k="place" value="${esc(g.place??LUGAR.place)}" maxlength="120"></label>
+      <label><span class="label">Link de Google Maps</span><input type="url" id="g-map" data-chg="gtext" data-k="map" value="${esc(g.map??LUGAR.map)}" placeholder="https://maps.app.goo.gl/…"></label>
+    </div></details>`}
     <div class="stack">
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[2],String(c.playing.length))}</span>`}<span class="label">Entraron</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[3],String(c.alive.length))}</span>`}<span class="label">Quedan</span></div>
@@ -1215,7 +1236,9 @@ function vInicio(){
     const state=ts.done?'Nivel terminado':ts.running?'En juego':ts.started?'En pausa':'Hoy, todavía no empezó';
     live=`<section class="card timer live">
       <div class="row spread"><span class="badge ${g.type}">${t.name}</span><span class="livetag ${ts.running?'on':''}">${state}</span></div>
+      ${g.title?`<div class="gtitle" style="color:var(--gold-hi)">${gTitle(g)}</div>`:''}
       <h2 style="color:var(--on-felt)">${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
+      ${gPlace(g,'onfelt')}
       <div class="livegrid">
         <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
         <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
@@ -1231,14 +1254,14 @@ function vInicio(){
       <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
   const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
       return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
-        <span><b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}</span></span>
+        <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}</span></span>
         <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
   const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
       const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('')+(r.ceb&&r.p1?`<span class="pod" style="color:var(--muted)">🧅 <span class="nm">${esc(pname(r.ceb))}</span></span>`:'');
       return `<button data-act="goGame" data-id="${id}">
-        <span class="phd"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span><b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
+        <span class="phd"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
@@ -1317,7 +1340,7 @@ const ACT={
     let first=null;
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
-      const id=uid('g'),g={type,date,time:ui.newTime||'',status:'open',createdAt:Date.now(),
+      const id=uid('g'),g={type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
         entry:prev.entry??'',food:'',foodMode:prev.foodMode||'total',foodPP:prev.foodMode==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
@@ -1393,6 +1416,7 @@ const ACT={
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{ui.editing=null;render()},
+  gedit:(d,el,e)=>{e.preventDefault();ui.gedit=!ui.gedit;render()},
   pinClose:()=>{ui.pinFor=null;ui.pinErr=null;render()},
   pinBackdrop:(d,el,e)=>{if(e.target===el)ACT.pinClose()},
   pinReset:d=>{if(ui.armed!=='pinR-'+d.pid){arm('pinR-'+d.pid);return}ui.armed=null;FB.pinReset(d.pid).then(()=>{ui.moveMsg=null}).catch(fail)},
@@ -1429,6 +1453,7 @@ const CHG={
   num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v})},
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid]=currentGame();Store.update('games',gid,{time:el.value})},
+  gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid]=currentGame();if(el.value)Store.update('games',gid,{date:el.value})},
   dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,2);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[d[0]||'',d[1]||'']})},
   pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value},resultManual:true})},
