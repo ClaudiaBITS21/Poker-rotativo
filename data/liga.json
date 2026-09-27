@@ -161,7 +161,10 @@
 "pmuhv796809l3": {
 "active": true,
 "createdAt": 1790395411760,
+"days": "",
+"hand": "",
 "name": "Alex",
+"phrase": "¿Quién no se comió un traba alguna vez?",
 "prev": {
 "pts": 27,
 "won": 3
@@ -171,13 +174,19 @@
 "pmuhvauker7ib": {
 "active": true,
 "createdAt": 1790395579454,
+"days": "vie",
+"hand": "",
 "name": "Sombrero",
+"phrase": "",
 "since": "2026-09-26"
 },
 "pmuhvay0f5mxx": {
 "active": true,
 "createdAt": 1790395583919,
+"days": "vie",
+"hand": "",
 "name": "Rulo",
+"phrase": "",
 "prev": {
 "pts": 3,
 "won": 0
