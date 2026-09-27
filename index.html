@@ -1020,6 +1020,7 @@ function render(){
   else if(gated) h+=vGate();
   else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats,cumples:vCumples,admin:vPanel})[ui.tab]();
   $('#main').innerHTML=h;
+  restoreDrafts();
   renderBig();
   renderModal();
   if(keep){const el=document.getElementById(keep.id);if(el){el.focus();if(el.tagName==='INPUT'&&el.type!=='file'){el.value=keep.v;try{el.setSelectionRange(keep.s,keep.e)}catch{}}}}
@@ -1568,7 +1569,7 @@ function vPanel(){
       <label><span class="label">Clave para entrar (opcional)</span><input type="text" id="tn-key" autocomplete="off" placeholder="vacío = entra cualquiera con el link"></label>
       ${tourFields('_new',{name:tours[TID]?'':(TID==='rotativo'?'Poker Rotativo':''),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:TYPES0})}
       <fieldset class="full ttype"><legend>Jugadores (se pueden sumar después)</legend>
-        <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" class="tn-pl" value="${pid}">${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div></fieldset>
+        <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" class="tn-pl" id="tn-pl-${pid}" value="${pid}">${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div></fieldset>
       <div class="row full"><button class="btn pri" type="submit">Crear torneo</button>${tours[TID]?'<button class="btn" type="button" data-act="tourNewToggle">Cancelar</button>':''}</div></form>`
     :'';
   return `${nuevoOpen?`<section class="card" data-suit="♦"><h2>Nuevo torneo</h2>
@@ -1824,9 +1825,9 @@ const ACT={
     const [m1,m2=[]]=drawTables(c.playing,dl);Store.update('games',gid,{tables:{m1,m2}});
   },
   statsType:d=>{ui.statsType=d.v;render()},
-  editCancel:()=>{ui.editing=null;render()},
+  editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
-  tourNewToggle:()=>{ui.tourNewOpen=!ui.tourNewOpen;render()},
+  tourNewToggle:()=>{if(ui.tourNewOpen)clearDrafts(document.querySelector('form[data-form="tourNew"]'));ui.tourNewOpen=!ui.tourNewOpen;render()},
   copyLink:d=>{try{navigator.clipboard.writeText(d.v).then(()=>{ui.moveMsg=null;alert('Link copiado: '+d.v)})}catch{prompt('Copiá el link:',d.v)}},
   tourReask:d=>{if(ui.armed!=='reask-'+d.v){arm('reask-'+d.v);return}ui.armed=null;const t=(ui.tours||{})[d.v];FB.saveTour(d.v,{keyV:(t&&t.keyV||1)+1}).catch(fail)},
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
@@ -1910,8 +1911,17 @@ document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset&&el.dataset.mask==='fecha'){const d=el.value.replace(/\D/g,'').slice(0,8);el.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d;return}
   if(!el.classList||!el.classList.contains('money'))return;el.value=moneyIn(el.value)});
 document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el)CHG[el.dataset.chg](el)});
+// Lo que se va escribiendo en un formulario (torneo nuevo, fichas, claves…) se guarda aparte, así no se pierde
+// cuando la pantalla se redibuja porque llegó un cambio de otro celular.
+ui.drafts={};
+document.addEventListener('input',e=>{const el=e.target,f=el.closest('form[data-form]');
+  if(el.id&&f&&el.type!=='password'&&!['pin','join'].includes(f.dataset.form))ui.drafts[el.id]=el.type==='checkbox'?el.checked:el.value});
+function restoreDrafts(){for(const [id,v] of Object.entries(ui.drafts)){const el=document.getElementById(id);if(!el){delete ui.drafts[id];continue}if(el===document.activeElement)continue;if(el.type==='checkbox')el.checked=v;else el.value=v}}
+function clearDrafts(f){if(!f){ui.drafts={};return}f.querySelectorAll('[id]').forEach(el=>delete ui.drafts[el.id])}
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
+  // si el formulario se aceptó (no apareció un error nuevo), lo escrito ya no es borrador
+  const e0=ui.err;setTimeout(()=>{if(!ui.err||ui.err===e0)clearDrafts(f)});
   if(f.dataset.form==='addPlayer'){
     const inp=$('#np-name'),name=inp.value.trim();if(!name)return;
     if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'.';render();return}
