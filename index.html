@@ -645,18 +645,22 @@ const FB={
     try{await m.signInWithPopup(this.auth,prov)}catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')await m.signInWithRedirect(this.auth,prov);else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')throw e}
   },
   async adminLogout(){await this.m.signOut(this.auth)},
-  // Trae jugadores (con sus puntos anteriores en este torneo) y partidas. Se puede repetir: pisa lo importado
-  // antes con los mismos datos y no toca los otros torneos del jugador.
+  // Trae jugadores (con sus puntos anteriores en este torneo) y partidas. Se puede repetir: solo completa lo que
+  // falta (jugadores o partidas nuevas, datos vacíos como el cumpleaños) y no pisa lo que ya se cambió en la app.
   async importar(data){
-    const m=this.m,res={players:0,prev:0,games:0};
-    const fix=(c,d)=>{d={...d};if(c==='games')d.tid=TID;else{d.ts={[TID]:d.prev?{prev:d.prev}:{}};delete d.prev}return d};
-    for(const c of ['players','games']){
-      let b=m.writeBatch(this.db),k=0;
-      for(const [id,d] of Object.entries(data[c]||{})){
-        b.set(m.doc(this.db,c,id),clean(fix(c,d)),c==='players'?{merge:true}:{});res[c]++;if(c==='players'&&d.prev)res.prev++;
-        if(++k%400===0){await b.commit();b=m.writeBatch(this.db)}}
-      await b.commit();
+    const m=this.m,res={players:0,fields:0,prev:0,games:0},all=ui.allPlayers||{};
+    const empty=v=>v===undefined||v===null||v==='';
+    let b=m.writeBatch(this.db),k=0;const add=async(ref,d,opt)=>{b.set(ref,clean(d),opt||{});if(++k%400===0){await b.commit();b=m.writeBatch(this.db)}};
+    for(const [id,d0] of Object.entries(data.players||{})){
+      const {prev,...d}=d0,cur=all[id];
+      if(!cur){await add(m.doc(this.db,'players',id),{...d,ts:{[TID]:prev?{prev}:{}}});res.players++;if(prev)res.prev++;continue}
+      const patch=Object.fromEntries(Object.entries(d).filter(([f,v])=>!empty(v)&&empty(cur[f])&&f!=='ts'));
+      const needTs=!cur.ts||!cur.ts[TID]||(prev&&!cur.ts[TID].prev);
+      if(needTs){patch.ts={[TID]:prev?{prev}:{}};if(prev)res.prev++}
+      if(Object.keys(patch).length){await add(m.doc(this.db,'players',id),patch,{merge:true});res.fields+=Object.keys(patch).length}
     }
+    for(const [id,g] of Object.entries(data.games||{})){if(S.games[id])continue;await add(m.doc(this.db,'games',id),{...g,tid:TID});res.games++}
+    await b.commit();
     return res;
   }
 };
@@ -1575,7 +1579,7 @@ function vPanel(){
         </form>
         <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="${t.open?'Poner una clave':'Nueva clave (vacío = sin clave)'}" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">${t.open?'Poner clave':'Cambiar clave'}</button></form>
         ${t.open?'':`<div class="row"><button class="btn ${ui.armed==='reask-'+tid?'armed':''}" data-act="tourReask" data-v="${tid}">${ui.armed==='reask-'+tid?'¿Seguro? Todos van a tener que ponerla otra vez':'Pedir la clave de nuevo a todos'}</button></div>`}
-        ${tid===TID?`<div class="aviso"><b>${Object.keys(S.games).length?'¿Volver a traer los datos de claude.ai?':'¿Traer los datos de claude.ai?'}</b> Jugadores, puntos anteriores y partidas del Rotativo.${Object.keys(S.games).length?' Lo que ya se importó se reemplaza por lo de claude.ai; las partidas nuevas no se tocan.':''}<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
+        ${tid===TID?`<div class="aviso"><b>${Object.keys(S.games).length?'¿Volver a traer los datos de claude.ai?':'¿Traer los datos de claude.ai?'}</b> Jugadores, puntos anteriores y partidas del Rotativo.${Object.keys(S.games).length?' Solo completa lo que falta (jugadores o partidas nuevas, cumpleaños vacíos…); no pisa lo que ya se cambió acá.':''}<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
         <div class="label">Jugadores de este torneo</div>
         <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" data-chg="tourPl" data-tid="${tid}" data-pid="${pid}" ${p.ts&&p.ts[tid]?'checked':''}>${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div>
       </div>`:''}
@@ -1874,7 +1878,7 @@ const ACT={
   adminDel:d=>{const l=(ui.admins||[]).filter(x=>x!==d.v);FB.set('config','admins',{emails:l,pids:ui.adminPids||[]}).catch(fail)},
   importar:async()=>{if(ui.armed!=='importar'){arm('importar');return}ui.armed=null;
     let data;try{const r=await fetch(new URL('data/liga.json',APPBASE||location.href),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);data=await r.json()}catch(e){ui.err='No se pudo leer el archivo con los datos ('+e.message+'). Recargá la página y probá de nuevo.';render();return}
-    try{const n=await FB.importar(data);ui.err=null;ui.moveMsg=null;alert(`Listo: ${n.players} jugadores (${n.prev} con puntos anteriores) y ${n.games} partidas.`)}
+    try{const n=await FB.importar(data);ui.err=null;ui.moveMsg=null;alert(n.players+n.fields+n.games?`Listo: ${n.players} jugadores nuevos, ${n.fields} datos completados${n.prev?' ('+n.prev+' con puntos anteriores)':''} y ${n.games} partidas nuevas.`:'Ya estaba todo: no faltaba nada.')}
     catch(e){ui.err='No se pudo importar ('+(e.code||e.message)+'). '+(e.code==='permission-denied'?'Entrá como administradora con claudia@rodo.es y probá de nuevo.':'Probá de nuevo.');render()}},
   statsMode:d=>{ui.statsMode=d.v;render()},
   // avatar
