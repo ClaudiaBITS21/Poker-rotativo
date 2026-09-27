@@ -338,6 +338,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .err{background:var(--red-soft);color:var(--red);border-radius:10px;padding:10px 14px;font-size:14px;font-weight:600}
 
 /* ---- selector de avatar ---- */
+.resp{font-style:normal;font-size:11px;font-weight:600;color:var(--muted)}.resp.si{color:var(--green)}.resp.no{color:var(--red)}
+.regmine{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}.regmine:first-of-type{border-top:0}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -481,7 +483,7 @@ const RANKS=['A','K','Q','J','10','9','8','7','6','5','4','3','2'];
 const EMOS=['🦈','🐟','🃏','🎩','😎','🤠','👑','💎','🍀','🔥','🎲','🥃','🍷','🍕','🤑','🧐','🦊','🐺','🦁','🐯','🐻','🐙','🦉','🐍','🦅','🤖','👻','🥷','🧙','🐢'];
 
 /* ---------- estado ---------- */
-const S={players:{},games:{},regalos:{}};
+const S={players:{},games:{},regalos:{},regpart:{}};
 const ui={tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
   armed:null,editing:null,err:null,loaded:false,avFor:null,avDraft:null,avTab:'chip'};
 try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
@@ -568,10 +570,14 @@ const FB={
   setInTour(pid,tid,on){const m=this.m;return m.updateDoc(m.doc(this.db,'players',pid),{['ts.'+tid]:on?{}:m.deleteField()})},
   regUnsub:null,
   watchRegalos(){
-    if(this.regUnsub){this.regUnsub();this.regUnsub=null}
-    if(!this.dataOn||!puedeCumples()){S.regalos={};return}
-    this.regUnsub=this.m.onSnapshot(this.m.collection(this.db,'regalos'),snap=>{S.regalos=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));render()},()=>{S.regalos={}});
+    if(this.regUnsub){this.regUnsub.forEach(f=>f());this.regUnsub=null}
+    S.regalos={};S.regpart={};ui.rpReady=false;
+    if(!this.dataOn)return;
+    const m=this.m,put=k=>snap=>{S[k]=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));if(k==="regpart")ui.rpReady=true;render()};
+    if(puedeCumples())this.regUnsub=[m.onSnapshot(m.collection(this.db,'regalos'),put('regalos'),()=>{}),m.onSnapshot(m.collection(this.db,'regpart'),put('regpart'),()=>{})];
+    else if(ui.session)this.regUnsub=[m.onSnapshot(m.query(m.collection(this.db,'regpart'),m.where('pid','==',ui.session)),put('regpart'),()=>{})];
   },
+  merge(c,id,data){return this.m.setDoc(this.m.doc(this.db,c,id),clean(data),{merge:true})},
   set(c,id,data){return this.m.setDoc(this.m.doc(this.db,c,id),clean(data))},
   update(c,id,patch){
     // las reglas piden saber a qué jugador toca un cambio dentro de parts
@@ -615,7 +621,7 @@ const Store={
     try{ if(window.claude&&claude.use) db=await claude.use('db'); }catch{}
     if(db){
       this.db=db;this.mode='db';
-      for(const c of ['players','games','regalos']){
+      for(const c of ['players','games','regalos','regpart']){
         db.collection(c).onSnapshot(snap=>{
           S[c]=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));
           ui.loaded=true;render();
@@ -629,7 +635,7 @@ const Store={
       try{await FB.init()}catch(e){ui.err='No se pudo cargar Firebase ('+(e.code||e.message)+'). Revisá la conexión y recargá.';ui.loaded=true;render()}
     }else{
       this.mode='local';
-      try{const raw=JSON.parse(localStorage.getItem('poker.data')||'{}');S.players=raw.players||{};S.games=raw.games||{};S.regalos=raw.regalos||{};}catch{}
+      try{const raw=JSON.parse(localStorage.getItem('poker.data')||'{}');S.players=raw.players||{};S.games=raw.games||{};S.regalos=raw.regalos||{};S.regpart=raw.regpart||{};}catch{}
       ui.loaded=true;render();
     }
     renderConn();
@@ -644,6 +650,11 @@ const Store={
     if(this.mode==='fb') return FB.update(c,id,patch).catch(fail);
     if(this.db) return this.db.doc(c+'/'+id).update(patch).catch(fail);
     S[c][id]=merge(structuredClone(S[c][id]||{}),patch);this.saveLocal();render();
+  },
+  // crea o mezcla (sin pisar lo que ya hay)
+  async upsert(c,id,data){
+    if(this.mode==='fb') return FB.merge(c,id,data).catch(fail);
+    return S[c][id]?this.update(c,id,data):this.set(c,id,data);
   },
   async del(c,id){
     if(this.mode==='fb') return FB.del(c,id).catch(fail);
@@ -722,6 +733,51 @@ async function fileToAvatar(file){
   }finally{URL.revokeObjectURL(url)}
 }
 
+
+/* ---------- regalos: aviso a los de los miércoles y lo que le toca poner a cada uno ---------- */
+const GIFT_DAYS=21;
+const esMie=p=>p&&p.active!==false&&p.days!=='vie';
+function snoozed(rid){if(ui.snooze&&ui.snooze[rid])return true;try{return localStorage.getItem('poker.snooze.'+rid)===today()}catch{return false}}
+// Cumpleaños de los miércoles en las próximas 3 semanas que este jugador todavía no contestó
+function giftPending(){
+  const m=me();if(!m||!esMie(S.players[m]))return null;
+  if(isFB()&&!ui.rpReady)return null;
+  const out=[];
+  for(const [id,p] of Object.entries(S.players)){
+    if(id===m||!p.bday||!esMie(p))continue;
+    const n=nextBday(p.bday);if(n.days>GIFT_DAYS)continue;
+    const rid=id+'_'+n.date.getFullYear();
+    if(S.regpart[rid+'__'+m]?.resp||snoozed(rid))continue;
+    out.push({id,rid,...n});
+  }
+  return out.sort((a,b)=>a.days-b.days)[0]||null;
+}
+function renderGift(w){
+  const g=giftPending();if(!g)return false;
+  const cu=g.days===0?'hoy':g.days===1?'mañana':'el '+g.date.getDate()+' de '+MESES[g.date.getMonth()]+' (en '+g.days+' días)';
+  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Regalo de cumpleaños">
+    <h2>🎁 Regalo para ${esc(pname(g.id))}</h2>
+    <div class="avprev">${avatar(g.id,64)}<div>${esc(pname(g.id))} cumple ${cu}. ¿Querés participar del regalo?<div class="small muted" style="margin-top:4px">${esc(pname(g.id))} no ve este aviso. El monto que te toca lo vas a ver en Inicio cuando se defina.</div></div></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn pri" data-act="giftYes" data-rid="${g.rid}">Sí, participo</button>
+      <button class="btn" data-act="giftNo" data-rid="${g.rid}">No esta vez</button>
+      <button class="btn" style="color:var(--muted)" data-act="giftLater" data-rid="${g.rid}">Después</button>
+    </div></section></div>`;
+  return true;
+}
+// Tarjeta en Inicio con los regalos en los que estás anotado y cuánto te toca
+function vMisRegalos(){
+  const m=me();if(!m)return '';
+  const items=Object.values(S.regpart).filter(x=>x.pid===m&&x.in).map(x=>{
+    const cid=x.rid.slice(0,x.rid.lastIndexOf('_')),p=S.players[cid]||ui.allPlayers?.[cid];if(!p||!p.bday)return null;
+    const [mm,dd]=p.bday.split('-').map(Number),y=+x.rid.slice(x.rid.lastIndexOf('_')+1),d=new Date(y,mm-1,dd);
+    const t=parseYmd(today()),diff=Math.round((d-t)/864e5);if(diff<-30||diff>GIFT_DAYS)return null;
+    return {x,p,d,diff};
+  }).filter(Boolean).sort((a,b)=>a.d-b.d);
+  if(!items.length)return '';
+  return `<section class="card" data-suit="♥"><h2>🎁 Regalos</h2>${items.map(({x,p,d})=>`<div class="regmine"><div><b>${esc(p.name)}</b> <span class="small muted">· cumple ${d.getDate()} ${MESES[d.getMonth()]}</span></div>
+    <div>${x.amt?`Te toca poner <b>${money(x.amt)}</b> · ${x.paid?'<span class="resp si">Pagado ✓</span>':'<span class="resp no">Pendiente</span>'}`:'<span class="small muted">Anotado. Todavía no se definió cuánto pone cada uno.</span>'}</div></div>`).join('')}</section>`;
+}
 
 /* ---------- torneo (nombre, lugar y tipos de partida configurables por la dueña) ---------- */
 const tourName=()=>(isFB()&&ui.tour&&ui.tour.name)||'Poker Rotativo';
@@ -1211,6 +1267,7 @@ function renderPin(w){
 function renderModal(){
   const w=$('#modal');
   if(ui.pinFor&&S.players[ui.pinFor]){renderPin(w);return}
+  if(!ui.avFor&&ui.loaded&&!(isFB()&&ui.gate!=='ok')&&renderGift(w))return;
   const pid=ui.avFor;
   if(!pid||!S.players[pid]){w.innerHTML='';return}
   const d=ui.avDraft,tab=ui.avTab;
@@ -1331,17 +1388,18 @@ function vCumples(){
   const con=act.filter(([,p])=>p.bday).map(([id,p])=>({id,p,...nextBday(p.bday)})).sort((a,b)=>a.days-b.days);
   const sin=act.filter(([,p])=>!p.bday);
   const card=x=>{
-    const rid=x.id+'_'+x.date.getFullYear(),r=S.regalos[rid]||{},parts=r.parts||{},open=ui.regOpen===rid;
+    const rid=x.id+'_'+x.date.getFullYear(),r=S.regalos[rid]||{},parts=partsOf(rid),open=ui.regOpen===rid;
     const inn=Object.entries(parts).filter(([,v])=>v.in),asig=inn.reduce((a,[,v])=>a+(+v.amt||0),0),pag=inn.filter(([,v])=>v.paid).reduce((a,[,v])=>a+(+v.amt||0),0);
     const edad=x.p.byear?` · cumple ${x.date.getFullYear()-x.p.byear}`:'';
     const cuando=x.days===0?'¡hoy!':x.days===1?'mañana':`en ${x.days} días`;
-    const resumen=r.monto?`${money(r.monto)} · ${inn.length} ponen · pagado ${money(pag)}${pag<r.monto?' · falta '+money(r.monto-pag):' ✓'}`:'Sin regalo cargado';
+    const resp=Object.values(parts).filter(v=>v.resp),si=resp.filter(v=>v.in).length;
+    const resumen=(resp.length?`${si} dijeron sí · ${resp.length-si} no · `:'')+(r.monto?`${money(r.monto)} · ${inn.length} ponen · pagado ${money(pag)}${pag<r.monto?' · falta '+money(r.monto-pag):' ✓'}`:'Sin monto cargado');
     let body='';
     if(open){
       body=`<div class="fields" style="margin-top:8px"><label><span class="label">Gasto del regalo</span><input type="text" inputmode="numeric" class="money" id="rg-m-${rid}" data-chg="regMonto" data-rid="${rid}" value="${moneyIn(r.monto)}" placeholder="$ 0"></label></div>
         <div class="row"><button class="btn" data-act="regSplit" data-rid="${rid}" ${r.monto&&inn.length?'':'disabled'}>Dividir en partes iguales</button><span class="small muted">Asignado ${money(asig)} de ${money(r.monto||0)}</span></div>
         <div class="reglist">${act.filter(([id])=>id!==x.id).map(([id,p])=>{const v=parts[id]||{};return `<div class="regrow ${v.in?'':'out'}">
-          <label class="chk"><input type="checkbox" data-chg="regIn" data-rid="${rid}" data-pid="${id}" ${v.in?'checked':''}>${avatar(id,22)}<span>${esc(p.name)}</span></label>
+          <label class="chk"><input type="checkbox" data-chg="regIn" data-rid="${rid}" data-pid="${id}" ${v.in?'checked':''}>${avatar(id,22)}<span>${esc(p.name)} <i class="resp ${v.resp?(v.in?'si':'no'):''}">${v.resp?(v.in?'dijo sí':'dijo no'):'sin responder'}</i></span></label>
           ${v.in?`<input type="text" inputmode="numeric" class="money" id="rg-a-${rid}-${id}" data-chg="regAmt" data-rid="${rid}" data-pid="${id}" value="${moneyIn(v.amt)}" placeholder="$ 0">
           <button class="btn ${v.paid?'paid':''}" data-act="regPaid" data-rid="${rid}" data-pid="${id}" aria-pressed="${!!v.paid}">${v.paid?'Pagó ✓':'Debe'}</button>`:'<span></span><span></span>'}
         </div>`}).join('')}</div>`;
@@ -1494,7 +1552,7 @@ function vInicio(){
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
-  return vPortada()+live+next+past;
+  return vPortada()+vMisRegalos()+live+next+past;
 }
 
 /* ---------- timer y alarma ---------- */
@@ -1554,6 +1612,9 @@ function alarm(){
 function setTimer(gid,t){return Store.update('games',gid,{timer:t})}
 
 /* ---------- acciones ---------- */
+// Participación de cada jugador en un regalo: doc <regalo>__<jugador> en regpart (cada uno ve solo la suya)
+const partsOf=rid=>Object.fromEntries(Object.values(S.regpart).filter(x=>x.rid===rid).map(x=>[x.pid,x]));
+const rpSave=(rid,pid,patch)=>Store.upsert('regpart',rid+'__'+pid,{rid,pid,...patch});
 function regSave(rid,patch){const [pid,y]=rid.split('_');return S.regalos[rid]?Store.update('regalos',rid,patch):Store.set('regalos',rid,merge({pid,year:+y,monto:'',parts:{}},patch))}
 const ACT={
   tab:d=>{ui.tab=d.tab;ui.editing=null;render();scrollTo(0,0)},
@@ -1651,9 +1712,12 @@ const ACT={
   copyLink:d=>{try{navigator.clipboard.writeText(d.v).then(()=>{ui.moveMsg=null;alert('Link copiado: '+d.v)})}catch{prompt('Copiá el link:',d.v)}},
   tourReask:d=>{if(ui.armed!=='reask-'+d.v){arm('reask-'+d.v);return}ui.armed=null;const t=(ui.tours||{})[d.v];FB.saveTour(d.v,{keyV:(t&&t.keyV||1)+1}).catch(fail)},
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
-  regPaid:d=>{const v=(S.regalos[d.rid]?.parts||{})[d.pid]||{};regSave(d.rid,{parts:{[d.pid]:{paid:!v.paid}}})},
-  regSplit:d=>{const r=S.regalos[d.rid]||{},inn=Object.keys(r.parts||{}).filter(k=>r.parts[k].in);if(!r.monto||!inn.length)return;
-    const each=Math.ceil(r.monto/inn.length/1000)*1000;regSave(d.rid,{parts:Object.fromEntries(inn.map(k=>[k,{amt:each}]))})},
+  regPaid:d=>{const v=partsOf(d.rid)[d.pid]||{};rpSave(d.rid,d.pid,{paid:!v.paid})},
+  regSplit:d=>{const r=S.regalos[d.rid]||{},ps=partsOf(d.rid),inn=Object.keys(ps).filter(k=>ps[k].in);if(!r.monto||!inn.length)return;
+    const each=Math.ceil(r.monto/inn.length/1000)*1000;inn.forEach(k=>rpSave(d.rid,k,{amt:each}))},
+  giftYes:d=>{rpSave(d.rid,me(),{in:true,resp:true,at:Date.now()})},
+  giftNo:d=>{rpSave(d.rid,me(),{in:false,resp:true,at:Date.now()})},
+  giftLater:d=>{try{localStorage.setItem('poker.snooze.'+d.rid,today())}catch{}ui.snooze={...(ui.snooze||{}),[d.rid]:1};render()},
   gedit:(d,el,e)=>{e.preventDefault();ui.gedit=!ui.gedit;render()},
   pinClose:()=>{ui.pinFor=null;ui.pinErr=null;render()},
   pinBackdrop:(d,el,e)=>{if(e.target===el)ACT.pinClose()},
@@ -1696,8 +1760,8 @@ const CHG={
   time:el=>{const [gid,g]=currentGame();if(canFinish(g))return;Store.update('games',gid,{time:el.value})},
   tourPl:el=>{FB.setInTour(el.dataset.pid,el.dataset.tid,el.checked).catch(fail)},
   regMonto:el=>{const v=digits(el.value);regSave(el.dataset.rid,{monto:v===''?'':+v})},
-  regAmt:el=>{const v=digits(el.value);regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{amt:v===''?'':+v}}})},
-  regIn:el=>{regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{in:el.checked}}})},
+  regAmt:el=>{const v=digits(el.value);rpSave(el.dataset.rid,el.dataset.pid,{amt:v===''?'':+v})},
+  regIn:el=>{rpSave(el.dataset.rid,el.dataset.pid,{in:el.checked})},
   gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid,g]=currentGame();if(canFinish(g))return;if(el.value)Store.update('games',gid,{date:el.value})},
   dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,2);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[d[0]||'',d[1]||'']})},

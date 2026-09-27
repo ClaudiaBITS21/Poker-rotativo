@@ -123,6 +123,19 @@ service cloud.firestore {
     match /regalos/{id} {
       allow read, write: if cumpleMgr();
     }
+    // Participación de cada jugador en un regalo (id = <regalo>__<jugador>). Cada uno ve y contesta solo
+    // la suya (sí / no); el monto y si pagó los pone quien organiza.
+    match /regpart/{id} {
+      allow read: if cumpleMgr() || (sessionOk() && resource.data.pid == myPid());
+      allow create: if cumpleMgr() || (sessionOk()
+        && request.resource.data.pid == myPid()
+        && id == request.resource.data.rid + '__' + myPid()
+        && request.resource.data.keys().hasOnly(['rid', 'pid', 'in', 'resp', 'at'])
+        && request.resource.data.in is bool);
+      allow update: if cumpleMgr() || (sessionOk() && resource.data.pid == myPid()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['in', 'resp', 'at']));
+      allow delete: if cumpleMgr();
+    }
 
     // Partidas de cada torneo. La maneja cualquiera que puso la clave; la asistencia (parts.<id>.st) de
     // cada jugador solo la cambia él mismo con su PIN, o un administrador.

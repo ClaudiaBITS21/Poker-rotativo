@@ -90,4 +90,17 @@ await t('anónimo no crea torneos',setDoc(doc(X,'tournaments','y'),{name:'y',key
 // regalos
 await t('X no ve regalos',getDoc(doc(X,'regalos','r')),false);
 await t('Firu escribe regalos',setDoc(doc(F,'regalos','r'),{monto:1}),true);
+// participación en regalos
+await t('Pato (sin sesión válida) no contesta',setDoc(doc(A,'regpart','r1__pA'),{rid:'r1',pid:'pA',in:true,resp:true,at:1}),false);
+const P=anon('uP');await join(P,'uP','rot','clave1',2);await newPin(P,'pB','2222');await login(P,'uP','pB','2222');
+await t('B contesta que participa',setDoc(doc(P,'regpart','r1__pB'),{rid:'r1',pid:'pB',in:true,resp:true,at:1}),true);
+await t('B no contesta por otro',setDoc(doc(P,'regpart','r1__pC'),{rid:'r1',pid:'pC',in:true,resp:true,at:1}),false);
+await t('B no se pone el monto',setDoc(doc(P,'regpart','r2__pB'),{rid:'r2',pid:'pB',in:true,resp:true,at:1,amt:0}),false);
+await t('Firu pone el monto de B',setDoc(doc(F,'regpart','r1__pB'),{amt:10000,paid:false},{merge:true}),true);
+await t('B ve su monto',getDoc(doc(P,'regpart','r1__pB')),true);
+await t('B busca los suyos',getDocs(query(collection(P,'regpart'),where('pid','==','pB'))),true);
+await t('B no lista los de todos',getDocs(collection(P,'regpart')),false);
+await t('B no se marca pagado',updateDoc(doc(P,'regpart','r1__pB'),{paid:true}),false);
+await t('B cambia de opinión',updateDoc(doc(P,'regpart','r1__pB'),{in:false,at:2}),true);
+await t('B no ve el total del regalo',getDoc(doc(P,'regalos','r1')),false);
 console.log(`\n${ok} ok, ${bad} fallaron`);await env.cleanup();process.exit(bad?1:0);
