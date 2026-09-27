@@ -51,10 +51,12 @@ guarda en el navegador (localStorage).
 
 En https://claudiabits21.github.io/Poker-rotativo/ la app guarda los datos en Firebase (proyecto `poker-rotativo`); en claude.ai sigue usando la base del artefacto.
 
-- Nadie necesita cuenta: todos entran con una sesión anónima y pueden ver la liga y manejar la partida (reloj, rebuys, eliminaciones, mesas, cuentas, resultado) y los jugadores.
-- Cada jugador elige su nombre en "¿Quién sos?" y crea un PIN de 4 números (🔒 en la lista cuando ya lo tiene). Con el PIN solo puede cambiar **su** asistencia; el celular lo recuerda.
-- Administradores: Firu, Coco y Mosca con su PIN, y claudia@rodo.es con Google ("Entrar como administradora" al pie). Pueden cambiar la asistencia de cualquiera, resetear PINs, borrar partidas y jugadores y sumar administradores (mails de Google).
-- El PIN nunca se guarda en claro: Firestore guarda un hash que nadie puede leer y las reglas (`firestore.rules`) validan todo del lado del servidor.
-- `data/liga.json` es la exportación de la base de claude.ai; el botón "Importar datos" (Jugadores → Administración, con la liga vacía) la carga en Firebase.
+- **Torneos:** cada uno tiene su link (`?t=rotativo`, `?t=amigos-club`…; sin nada, el Rotativo), su nombre, frase de portada, dirección por defecto, tipos de partida (nombre, día, minutos por nivel, puntos y reparto del premio) y su **clave**. La primera vez, cada celular pone la clave del torneo; sin ella no se ve nada. "Pedir la clave de nuevo" obliga a todos a volver a ponerla.
+- **Jugadores compartidos** entre torneos, con el mismo PIN; en qué torneos está cada uno lo decide solo la dueña. Los puntos de la liga anterior quedan dentro del torneo.
+- **PIN:** cada jugador elige su nombre en "¿Quién sos?" y crea un PIN de 4 números (🔒 en la lista). Con el PIN solo cambia **su** asistencia; el celular lo recuerda. La partida (reloj, rebuys, eliminaciones, mesas, cuentas, resultado) la maneja cualquiera que entró con la clave.
+- **Dueña** (Firu con su PIN o claudia@rodo.es con Google): solapa ⚙️ para crear y editar torneos, claves y jugadores de cada uno, y ver quién ya puso PIN, en cuántos celulares entró y cuándo.
+- **Administradores** (Firu, Coco y Mosca con PIN; mails agregados por la dueña): cambian cualquier asistencia, resetean PINs y borran partidas o jugadores.
+- Las claves y los PIN nunca se guardan en claro: Firestore guarda hashes que nadie puede leer, y las reglas (`firestore.rules`) validan todo del lado del servidor. `test/reglas.test.mjs` las prueba con el emulador.
+- `data/liga.json` es la exportación de la base de claude.ai; "Importar datos" (⚙️, en el torneo vacío) la carga en el Rotativo.
 
 Configuración en la consola de Firebase: Authentication con Anónimo y Google activados y `claudiabits21.github.io` en dominios autorizados; Firestore en modo producción con las reglas de `firestore.rules`.

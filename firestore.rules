@@ -1,27 +1,20 @@
 rules_version = '2';
 // Reglas del Torneo Poker Rotativo (Firestore). Se pegan en Firebase → Firestore Database → Reglas.
 //
-// - Todos entran sin cuenta (sesión anónima), ven la liga y pueden manejar la partida y los jugadores.
-// - La asistencia de cada jugador solo la cambia él mismo con su PIN. El PIN nunca se guarda en
-//   claro: solo un hash que nadie puede leer (pins/{pid}). Al ingresarlo se crea sessions/{uid},
-//   que solo se acepta si el hash coincide.
-// - Los administradores (Firu, Coco y Mosca con su PIN, claudia@rodo.es con Google, y la lista config/admins) además pueden
-//   resetear PINs, cambiar la asistencia de cualquiera y borrar partidas o jugadores.
+// - Hay varios torneos (tournaments/{tid}), cada uno con su link (?t=tid) y su clave. Para ver algo de un
+//   torneo, ese celular tiene que haber puesto la clave: se guarda members/{tid}_{uid}, que solo se acepta si
+//   el hash coincide con tkeys/{tid} (que nadie puede leer). Si la dueña "pide la clave de nuevo", sube keyV
+//   y los celulares tienen que volver a ponerla.
+// - Los jugadores son compartidos entre torneos, con el mismo PIN; en qué torneos está cada uno lo decide
+//   solo la dueña (campo ts del jugador).
+// - Dentro de un torneo, cualquiera que puso la clave maneja la partida; la asistencia de cada jugador solo
+//   la cambia él con su PIN (el PIN se guarda como hash que nadie puede leer).
+// - Dueña: claudia@rodo.es con Google o Firu con su PIN: crea torneos, claves y asigna jugadores.
+// - Administradores (Firu, Coco y Mosca con PIN, claudia@rodo.es con Google y config/admins): además
+//   resetean PINs, cambian cualquier asistencia y borran partidas o jugadores.
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
-    // Administradores: Firu (Claudia), Coco y Mosca con su PIN, claudia@rodo.es con Google, y quien esté en config/admins.
-    function isAdmin() {
-      return signedIn() && (
-        (request.auth.token.email != null && request.auth.token.email_verified == true
-          && (request.auth.token.email == 'claudia@rodo.es'
-              || (exists(/databases/$(db)/documents/config/admins)
-                  && request.auth.token.email in get(/databases/$(db)/documents/config/admins).data.get('emails', []))))
-        || (sessionOk() && (myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd', 'pmuhv64b614dy']
-              || (exists(/databases/$(db)/documents/config/admins)
-                  && myPid() in get(/databases/$(db)/documents/config/admins).data.get('pids', [])))));
-    }
-    // id del jugador de esta sesión, solo si su PIN sigue siendo válido (si el admin lo resetea, se corta)
     function sessionOk() {
       return signedIn()
         && exists(/databases/$(db)/documents/sessions/$(request.auth.uid))
@@ -30,25 +23,72 @@ service cloud.firestore {
            == get(/databases/$(db)/documents/pins/$(get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid)).data.h;
     }
     function myPid() { return get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid; }
-
-    // Cumpleaños y regalos: solo Firu (Claudia) y Coco con su PIN, o claudia@rodo.es con Google.
-    function cumpleMgr() {
-      return signedIn() && (
-        (request.auth.token.email == 'claudia@rodo.es' && request.auth.token.email_verified == true)
-        || (sessionOk() && myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd']));
+    function googleOwner() {
+      return signedIn() && request.auth.token.email == 'claudia@rodo.es' && request.auth.token.email_verified == true;
     }
-    match /regalos/{id} {
-      allow read, write: if cumpleMgr();
+    function isOwner() { return googleOwner() || (sessionOk() && myPid() == 'pmuhuxmb6f8rh'); }
+    function isAdmin() {
+      return isOwner() || (signedIn() && (
+        (request.auth.token.email != null && request.auth.token.email_verified == true
+          && exists(/databases/$(db)/documents/config/admins)
+          && request.auth.token.email in get(/databases/$(db)/documents/config/admins).data.get('emails', []))
+        || (sessionOk() && (myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd', 'pmuhv64b614dy']
+              || (exists(/databases/$(db)/documents/config/admins)
+                  && myPid() in get(/databases/$(db)/documents/config/admins).data.get('pids', []))))));
     }
+    // Este celular puso la clave vigente del torneo
+    function isMember(tid) {
+      return isOwner() || (signedIn()
+        && exists(/databases/$(db)/documents/members/$(tid + '_' + request.auth.uid))
+        && get(/databases/$(db)/documents/members/$(tid + '_' + request.auth.uid)).data.v
+           == get(/databases/$(db)/documents/tournaments/$(tid)).data.keyV);
+    }
+    // Puso la clave de algún torneo (para ver la lista de jugadores y los candados)
+    function anyMember() { return isOwner() || (signedIn() && exists(/databases/$(db)/documents/memberOf/$(request.auth.uid))); }
+    function cumpleMgr() { return googleOwner() || (sessionOk() && myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd']); }
 
     match /config/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if anyMember();
+      allow write: if isOwner();
     }
 
-    // Cualquiera de la mesa puede agregar y editar jugadores; borrar, solo un administrador.
+    // Torneos: cualquiera abre el suyo por el link (nombre, tipos de partida, lugar); la lista completa y los
+    // cambios, solo la dueña.
+    match /tournaments/{tid} {
+      allow get: if signedIn();
+      allow list, write: if isOwner();
+    }
+    match /tkeys/{tid} {
+      allow read: if false;
+      allow write: if isOwner();
+    }
+    match /members/{mid} {
+      allow get: if signedIn() && mid.matches('^.*_' + request.auth.uid + '$');
+      allow list, delete: if isOwner();
+      allow create, update: if signedIn()
+        && mid == request.resource.data.tid + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['tid', 'uid', 'h', 'v', 'at'])
+        && exists(/databases/$(db)/documents/tkeys/$(request.resource.data.tid))
+        && get(/databases/$(db)/documents/tkeys/$(request.resource.data.tid)).data.h == request.resource.data.h
+        && request.resource.data.v == get(/databases/$(db)/documents/tournaments/$(request.resource.data.tid)).data.keyV;
+    }
+    match /memberOf/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['tid'])
+        && existsAfter(/databases/$(db)/documents/members/$(request.resource.data.tid + '_' + uid));
+    }
+
+    // Jugadores (compartidos): los ven quienes entraron a algún torneo. Cualquiera de la mesa edita la ficha;
+    // en qué torneos está cada uno (ts) solo lo cambia la dueña. Al crear uno, queda solo en tu torneo.
     match /players/{pid} {
-      allow read, create, update: if signedIn();
+      allow read: if anyMember();
+      allow create: if isOwner() || (anyMember()
+        && request.resource.data.get('ts', {}).keys().size() == 1
+        && isMember(request.resource.data.ts.keys()[0])
+        && request.resource.data.ts[request.resource.data.ts.keys()[0]].keys().size() == 0);
+      allow update: if isOwner() || (anyMember() && request.resource.data.get('ts', {}) == resource.data.get('ts', {}));
       allow delete: if isAdmin();
     }
 
@@ -62,31 +102,37 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin();
     }
-    // Aviso público de que ese jugador ya tiene PIN (para pedir "creá tu PIN" o "ingresá tu PIN").
+    // Aviso público de que ese jugador ya tiene PIN (el candado de la lista).
     match /pinflags/{pid} {
-      allow read: if signedIn();
+      allow read: if anyMember();
       allow create: if signedIn() && request.resource.data.keys().hasOnly(['at'])
         && existsAfter(/databases/$(db)/documents/pins/$(pid));
       allow update: if false;
       allow delete: if isAdmin();
     }
-
+    // Quién está en cada celular (con su PIN). La dueña ve la lista para saber quién ya entró.
     match /sessions/{uid} {
-      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow get, delete: if signedIn() && request.auth.uid == uid;
+      allow list: if isOwner();
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['pid', 'h'])
+        && request.resource.data.keys().hasOnly(['pid', 'h', 'at'])
         && exists(/databases/$(db)/documents/pins/$(request.resource.data.pid))
         && get(/databases/$(db)/documents/pins/$(request.resource.data.pid)).data.h == request.resource.data.h;
     }
 
-    // La partida la maneja cualquiera de la mesa (reloj, rebuys, eliminaciones, mesas, cuentas, resultado).
-    // La asistencia (parts.<id>.st) de cada jugador solo la cambia él mismo con su PIN, o un administrador.
+    match /regalos/{id} {
+      allow read, write: if cumpleMgr();
+    }
+
+    // Partidas de cada torneo. La maneja cualquiera que puso la clave; la asistencia (parts.<id>.st) de
+    // cada jugador solo la cambia él mismo con su PIN, o un administrador.
     match /games/{gid} {
-      allow read: if signedIn();
-      // una partida nueva arranca sin anotados (nadie puede anotar a otros al crearla)
-      allow create: if isAdmin() || (signedIn() && request.resource.data.get('parts', {}).size() == 0);
-      allow delete: if isAdmin();
-      allow update: if isAdmin() || (signedIn() && partsOk());
+      allow read: if isMember(resource.data.tid);
+      allow create: if isMember(request.resource.data.tid)
+        && (isAdmin() || request.resource.data.get('parts', {}).size() == 0);
+      allow update: if isMember(resource.data.tid) && request.resource.data.tid == resource.data.tid
+        && (isAdmin() || partsOk());
+      allow delete: if isAdmin() && isMember(resource.data.tid);
     }
     // Cada cambio toca a lo sumo un jugador dentro de parts (la app lo indica en el campo _p);
     // si cambia su asistencia, tiene que ser él mismo.

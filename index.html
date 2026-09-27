@@ -322,6 +322,13 @@ tfoot td{font-weight:700;border-bottom:0}
 .regrow input.money{width:110px;min-height:34px;padding:4px 8px}
 .regrow .btn{min-height:34px;padding:4px 10px;font-size:13px}
 .btn.paid{background:var(--green);border-color:var(--green);color:#fff}
+.tours{display:flex;flex-direction:column}
+.tour{border-top:1px solid var(--line);padding:4px 0}.tour:first-child{border-top:0}
+.tour.cur .cumhead b{color:var(--felt)}
+.tbody{display:flex;flex-direction:column;gap:10px;padding:6px 0 12px}
+.ttype{border:1px solid var(--line);border-radius:12px;padding:8px 12px 12px}.ttype legend{font-weight:700;font-size:13px;padding:0 4px}
+.tplayers{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 10px}
+.tplayers .chk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -444,7 +451,7 @@ tfoot td{font-weight:700;border-bottom:0}
 
 <header class="rail">
   <div class="rail-in">
-    <div class="brand"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#AC271F"/><circle cx="32" cy="32" r="26" fill="none" stroke="#FFF6EC" stroke-width="9" stroke-dasharray="10.2 10.2"/><circle cx="32" cy="32" r="19" fill="#0C0C0C" stroke="#DEAD6E" stroke-width="2"/><path d="M32 18c-5 7-11 10-11 16a6 6 0 0 0 10 4.5L29.5 45h5L33 38.5A6 6 0 0 0 43 34c0-6-6-9-11-16z" fill="#DEAD6E"/></svg><div class="bt"><small>Torneo</small><h1>Poker Rotativo</h1></div></div>
+    <div class="brand"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#AC271F"/><circle cx="32" cy="32" r="26" fill="none" stroke="#FFF6EC" stroke-width="9" stroke-dasharray="10.2 10.2"/><circle cx="32" cy="32" r="19" fill="#0C0C0C" stroke="#DEAD6E" stroke-width="2"/><path d="M32 18c-5 7-11 10-11 16a6 6 0 0 0 10 4.5L29.5 45h5L33 38.5A6 6 0 0 0 43 34c0-6-6-9-11-16z" fill="#DEAD6E"/></svg><div class="bt"><small>Torneo</small><h1 id="tname">Poker Rotativo</h1></div></div>
     <div id="me"></div>
   </div>
   <nav class="tabs" id="tabs"></nav>
@@ -465,6 +472,8 @@ const TYPES={
   mie:{name:'Rápido',dow:3,min:7,pts:[5,2],split:[70,30]},
   vie:{name:'Con rebuy',dow:5,min:12,pts:[7,3,1],split:[60,30,10]}
 };
+const TYPES0=JSON.parse(JSON.stringify(TYPES));
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const ST={no:'No va',juega:'Juega',come:'Juega + come'};
 const CHIPC=['#C1272D','#1F4FA8','#17744B','#1B1713','#6B3FA0','#E07A1F','#D64B8A','#0F8A8A','#8A5A2B','#B8901F'];
 const SUITS={s:'♠',h:'♥',d:'♦',c:'♣'};
@@ -483,8 +492,11 @@ const FIREBASE={apiKey:"AIzaSyC5TffA6ZDcNw2OJRiimsdTjzV2yqgXc1A",authDomain:"pok
   storageBucket:"poker-rotativo.firebasestorage.app",messagingSenderId:"518862049014",appId:"1:518862049014:web:b00d16ff6f463dd6aee6d7"};
 const FBV='https://www.gstatic.com/firebasejs/10.14.1/';
 const OWNER='claudia@rodo.es';
+const OWNER_PID='pmuhuxmb6f8rh'; // Firu (Claudia): dueña también entrando con su PIN
+// Torneo de este link (?t=...). Sin nada, el Rotativo.
+const TID=(new URLSearchParams(location.search).get('t')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
 // Lugar por defecto de las partidas de este torneo (cada partida lo puede cambiar)
-const LUGAR={place:'Eduardo Acevedo 29',map:'https://maps.app.goo.gl/UN5vwaNmuBCdKpTc6'};
+const LUGAR={place:'Eduardo Acevedo 29',map:'https://maps.app.goo.gl/UN5vwaNmuBCdKpTc6'}; // se reemplaza por el del torneo
 // update() de Firestore reemplaza los mapas enteros: se pasa a rutas con puntos ("parts.p1.st") para mezclar como antes.
 // El avatar sí se reemplaza entero (si no, quedan restos de otro tipo de avatar).
 function flatten(o,pre='',out={}){for(const [k,v] of Object.entries(o)){const key=pre+k;if(v&&typeof v==='object'&&!Array.isArray(v)&&k!=='av'&&Object.keys(v).length)flatten(v,key+'.',out);else out[key]=v}return out}
@@ -505,18 +517,59 @@ const FB={
     });
   },
   listen(){
-    const m=this.m;this.unsub.forEach(f=>f());this.unsub=[];
-    const onErr=e=>{ui.err=e.code==='permission-denied'?'Firebase no deja leer los datos: revisá que estén pegadas las reglas de seguridad.':'Se perdió la conexión ('+e.code+'). Recargá la página.';ui.loaded=true;render()};
-    for(const c of ['players','games']) this.unsub.push(m.onSnapshot(m.collection(this.db,c),snap=>{S[c]=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));ui.loaded=true;render()},onErr));
-    this.watchRegalos();
-    this.unsub.push(m.onSnapshot(m.collection(this.db,'pinflags'),snap=>{ui.pinflags=new Set(snap.docs.map(d=>d.id));render()},()=>{}));
-    this.unsub.push(m.onSnapshot(m.doc(this.db,'config','admins'),d=>{ui.admins=d.exists()?(d.data().emails||[]):[];ui.adminPids=d.exists()?(d.data().pids||[]):[];render()},()=>{ui.admins=[];ui.adminPids=[]}));
-    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),d=>{ui.session=d.exists()?d.data().pid:null;this.watchRegalos();render()},()=>{ui.session=null}));
+    const m=this.m;this.unsub.forEach(f=>f());this.unsub=[];this.stopData();
+    const soft=()=>{};
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'tournaments',TID),d=>{ui.tour=d.exists()?d.data():null;ui.tourLoaded=true;applyTour();this.gate()},e=>{ui.tourLoaded=true;ui.err='No se pudo abrir el torneo ('+e.code+').';this.gate()}));
+    // solo cuenta lo que confirmó el servidor (una clave o un PIN incorrectos se ven un instante antes de ser rechazados)
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'members',TID+'_'+this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.memberV=d.exists()?d.data().v:null;this.gate()},()=>{ui.memberV=null;this.gate()}));
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.session=d.exists()?d.data().pid:null;this.gate();this.watchRegalos();this.watchOwner()},()=>{ui.session=null;this.gate()}));
   },
+  // Entra al torneo quien puso la clave vigente (o la dueña)
+  gate(){
+    const ok=isOwner()||!!(ui.tour&&ui.memberV!=null&&ui.memberV===ui.tour.keyV);
+    ui.gate=!ui.tourLoaded?'wait':ok?'ok':!ui.tour?'missing':'key';
+    if(ok&&!this.dataOn)this.startData();else if(!ok&&this.dataOn)this.stopData();
+    if(ui.gate!=='ok')ui.loaded=true;
+    render();
+  },
+  dataOn:false,dunsub:[],
+  startData(){
+    const m=this.m,onErr=e=>{ui.err=e.code==='permission-denied'?'Firebase no deja leer los datos: revisá que estén pegadas las reglas de seguridad.':'Se perdió la conexión ('+e.code+'). Recargá la página.';ui.loaded=true;render()};
+    this.dataOn=true;
+    this.dunsub.push(m.onSnapshot(m.collection(this.db,'players'),snap=>{ui.allPlayers=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));S.players=Object.fromEntries(Object.entries(ui.allPlayers).filter(([,p])=>p.ts&&p.ts[TID]));ui.loaded=true;render()},onErr));
+    this.dunsub.push(m.onSnapshot(m.query(m.collection(this.db,'games'),m.where('tid','==',TID)),snap=>{S.games=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));ui.loaded=true;render()},onErr));
+    this.dunsub.push(m.onSnapshot(m.collection(this.db,'pinflags'),snap=>{ui.pinflags=new Set(snap.docs.map(d=>d.id));ui.pinAt=Object.fromEntries(snap.docs.map(d=>[d.id,d.data().at]));render()},()=>{}));
+    this.dunsub.push(m.onSnapshot(m.doc(this.db,'config','admins'),d=>{ui.admins=d.exists()?(d.data().emails||[]):[];ui.adminPids=d.exists()?(d.data().pids||[]):[];render()},()=>{ui.admins=[];ui.adminPids=[]}));
+    this.watchRegalos();this.watchOwner();
+  },
+  stopData(){this.dunsub.forEach(f=>f());this.dunsub=[];this.dataOn=false;if(this.ownUnsub){this.ownUnsub.forEach(f=>f());this.ownUnsub=null}},
+  // Lo que solo ve la dueña: todos los torneos, quién entró con la clave y los celulares con PIN
+  ownUnsub:null,
+  watchOwner(){
+    if(this.ownUnsub){this.ownUnsub.forEach(f=>f());this.ownUnsub=null}
+    if(!this.dataOn||!isOwner()){ui.tours=null;return}
+    const m=this.m;this.ownUnsub=[
+      m.onSnapshot(m.collection(this.db,'tournaments'),snap=>{ui.tours=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));render()},()=>{}),
+      m.onSnapshot(m.collection(this.db,'members'),snap=>{ui.members=snap.docs.map(d=>d.data());render()},()=>{}),
+      m.onSnapshot(m.collection(this.db,'sessions'),snap=>{ui.sessions=snap.docs.map(d=>d.data());render()},()=>{})];
+  },
+  async join(key){
+    const m=this.m,uid=this.user.uid,h=await sha(TID+':'+key),b=m.writeBatch(this.db);
+    b.set(m.doc(this.db,'members',TID+'_'+uid),{tid:TID,uid,h,v:ui.tour.keyV,at:Date.now()});
+    b.set(m.doc(this.db,'memberOf',uid),{tid:TID});
+    await b.commit();
+  },
+  async saveTour(tid,data,key){
+    const m=this.m,b=m.writeBatch(this.db);
+    b.set(m.doc(this.db,'tournaments',tid),clean(data),{merge:true});
+    if(key)b.set(m.doc(this.db,'tkeys',tid),{h:await sha(tid+':'+key)});
+    await b.commit();
+  },
+  setInTour(pid,tid,on){const m=this.m;return m.updateDoc(m.doc(this.db,'players',pid),{['ts.'+tid]:on?{}:m.deleteField()})},
   regUnsub:null,
   watchRegalos(){
     if(this.regUnsub){this.regUnsub();this.regUnsub=null}
-    if(!puedeCumples()){S.regalos={};return}
+    if(!this.dataOn||!puedeCumples()){S.regalos={};return}
     this.regUnsub=this.m.onSnapshot(this.m.collection(this.db,'regalos'),snap=>{S.regalos=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));render()},()=>{S.regalos={}});
   },
   set(c,id,data){return this.m.setDoc(this.m.doc(this.db,c,id),clean(data))},
@@ -529,7 +582,7 @@ const FB={
   async pinLogin(pid,pin,isNew){
     const m=this.m,h=await sha(pid+':'+pin);
     if(isNew){const b=m.writeBatch(this.db);b.set(m.doc(this.db,'pins',pid),{h});b.set(m.doc(this.db,'pinflags',pid),{at:Date.now()});await b.commit()}
-    await m.setDoc(m.doc(this.db,'sessions',this.user.uid),{pid,h});
+    await m.setDoc(m.doc(this.db,'sessions',this.user.uid),{pid,h,at:Date.now()});
   },
   async pinLogout(){await this.m.deleteDoc(this.m.doc(this.db,'sessions',this.user.uid))},
   async pinReset(pid){const m=this.m,b=m.writeBatch(this.db);b.delete(m.doc(this.db,'pins',pid));b.delete(m.doc(this.db,'pinflags',pid));await b.commit()},
@@ -540,11 +593,13 @@ const FB={
   async adminLogout(){await this.m.signOut(this.auth)},
   async importar(data){
     const m=this.m;let b=m.writeBatch(this.db),n=0;
-    for(const c of ['players','games'])for(const [id,d] of Object.entries(data[c]||{})){b.set(m.doc(this.db,c,id),clean(d));if(++n%400===0){await b.commit();b=m.writeBatch(this.db)}}
+    const fix=(c,d)=>{d={...d};if(c==='games')d.tid=TID;else{d.ts={[TID]:d.prev?{prev:d.prev}:{}};delete d.prev}return d};
+    for(const c of ['players','games'])for(const [id,d] of Object.entries(data[c]||{})){b.set(m.doc(this.db,c,id),clean(fix(c,d)));if(++n%400===0){await b.commit();b=m.writeBatch(this.db)}}
     await b.commit();return n;
   }
 };
 const isFB=()=>Store.mode==='fb';
+const isOwner=()=>isFB()&&!!(ui.fbEmail===OWNER||ui.session===OWNER_PID);
 // En Firebase solo los administradores editan todo; cada jugador, su asistencia y su ficha (las reglas lo hacen cumplir).
 const ADMIN_PIDS=['pmuhuxmb6f8rh','pmuhv51jbc5kd','pmuhv64b614dy']; // Firu (Claudia), Coco y Mosca: administradores entrando con su PIN
 const CUMPLE_PIDS=['pmuhuxmb6f8rh','pmuhv51jbc5kd']; // Firu (Claudia) y Coco: solapa Cumpleaños y regalos
@@ -668,6 +723,18 @@ async function fileToAvatar(file){
 }
 
 
+/* ---------- torneo (nombre, lugar y tipos de partida configurables por la dueña) ---------- */
+const tourName=()=>(isFB()&&ui.tour&&ui.tour.name)||'Poker Rotativo';
+const tourSub=()=>(isFB()&&ui.tour&&ui.tour.subtitle)||'Miércoles rápido · Viernes SUM';
+function applyTour(){
+  const t=ui.tour||{};
+  for(const k of ['mie','vie'])Object.assign(TYPES[k],JSON.parse(JSON.stringify(TYPES0[k])),t.types&&t.types[k]||{});
+  if(t.place!=null)LUGAR.place=t.place;if(t.map!=null)LUGAR.map=t.map;
+  document.title='Torneo '+tourName();
+}
+// Puntos de la liga anterior: dentro del torneo (Firebase) o en el jugador (claude.ai)
+const prevOf=p=>isFB()?(p.ts&&p.ts[TID]&&p.ts[TID].prev):p.prev;
+
 /* ---------- cumpleaños ---------- */
 // bday = "MM-DD" (el año es opcional, en byear)
 const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sept','oct','nov','dic'];
@@ -779,7 +846,7 @@ function stats(type,noPrev){
     ['p1','p2','p3'].forEach((k,i)=>{const id=res[k];if(id&&out[id]&&t.pts[i]!=null){out[id][k]++;out[id].pts+=t.pts[i];out[id].won+=c.prizes[i]||0;}});
   }
   // Puntos y partidas ganadas de la liga anterior (solo cuentan en "Todos")
-  if(type==='all'&&!noPrev) for(const [id,p] of Object.entries(S.players)) if(p.prev&&out[id]){out[id].pts+=p.prev.pts||0;out[id].p1+=p.prev.won||0;out[id].prev=true}
+  if(type==='all'&&!noPrev) for(const [id,p] of Object.entries(S.players)){const pv=prevOf(p);if(pv&&out[id]){out[id].pts+=pv.pts||0;out[id].p1+=pv.won||0;out[id].prev=true}}
   return {games:games.length,rows:Object.values(out).sort((a,b)=>b.pts-a.pts||b.p1-a.p1||b.pj-a.pj||a.name.localeCompare(b.name,'es'))};
 }
 
@@ -795,10 +862,13 @@ function render(){
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
   if(soloVie()){if(ui.tab==='stats')ui.tab='inicio';ui.newType='vie'}
   if(ui.tab==='cumples'&&!puedeCumples())ui.tab='inicio';
-  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[])]
+  $('#tname').textContent=tourName();
+  const gated=isFB()&&ui.gate!=='ok';
+  if(ui.tab==='admin'&&!isOwner())ui.tab='inicio';
+  $('#tabs').innerHTML=gated?'':[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[]),...(isOwner()?[['admin','⚙️']]:[])]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
-  $('#me').innerHTML=!ui.loaded?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
+  $('#me').innerHTML=!ui.loaded||gated?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
     :sortedPlayers().length?`<select class="mesel" id="me-sel" data-chg="me" aria-label="Quién sos"><option value="">¿Quién sos?</option>${sortedPlayers().filter(([,p])=>p.active!==false).map(([id,p])=>`<option value="${id}">${esc(p.name)}${lock(id)}</option>`).join('')}</select>`:'';
   $('#adminbar').innerHTML=!isFB()?'':ui.fbEmail?`<span>${isAdmin()?'Administradora':'Sin permisos de administrador'}: ${esc(ui.fbEmail)} · <button class="linkbtn" data-act="adminOut">salir</button></span>`
     :`<button class="linkbtn" data-act="adminIn">Entrar como administradora</button>`;
@@ -808,7 +878,8 @@ function render(){
     <p>Esta app guarda las partidas en una base compartida, y tu cuenta todavía no tiene permiso para verla. Por eso no ves los jugadores ni las partidas que ya se cargaron.</p>
     <p><b>Qué hacer:</b> pedile a quien te pasó el link que te invite desde el botón <b>Compartir</b> del artefacto, con el mail de tu cuenta de Claude. Como <b>Editor</b> vas a poder anotar asistencia y rebuys; como <b>Lector</b>, solo mirar.</p>
     <p class="small muted">Un link público no alcanza: los datos compartidos solo se ven con una cuenta invitada. Después de que te inviten, recargá esta página.</p></section>`;
-  else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats,cumples:vCumples})[ui.tab]();
+  else if(gated) h+=vGate();
+  else h+=({inicio:vInicio,partida:vPartida,jugadores:vJugadores,stats:vStats,cumples:vCumples,admin:vPanel})[ui.tab]();
   $('#main').innerHTML=h;
   renderBig();
   renderModal();
@@ -841,13 +912,13 @@ function vNewGame(){
   const np=Object.values(S.players).filter(p=>p.active!==false).length;
   const ty=ui.newType,date=ui.newDate||nextDow(TYPES[ty].dow);
   const opt=(k,pip,title,items)=>`<button class="opt ${k}" data-act="newType" data-v="${k}" data-pip="${pip}" aria-pressed="${ty===k}">
-      <span class="badge ${k}">${TYPES[k].name}</span><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></button>`;
+      <span class="badge ${k}">${esc(TYPES[k].name)}</span><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></button>`;
   return `<section class="card" data-suit="♠">
     <h2>Programar partida</h2>
     ${np?'':`<p class="muted">Primero cargá los jugadores en la solapa <b>Jugadores</b>.</p>`}
     <div class="typepick">
-      ${soloVie()?'':opt('mie','♣','Tipo miércoles',['Niveles de 7 min','1 recompra incluida en la entrada','Puntos 5 · 2','Premio 70 / 30'])}
-      ${opt('vie','♥','Tipo viernes',['Niveles de 12 min','Rebuys hasta terminar 10-20','Puntos 7 · 3 · 1','Premio 60 / 30 / 10'])}
+      ${soloVie()?'':opt('mie','♣','Tipo '+DIAS[TYPES.mie.dow],['Niveles de '+TYPES.mie.min+' min','1 recompra incluida en la entrada','Puntos '+TYPES.mie.pts.join(' · '),'Premio '+TYPES.mie.split.join(' / ')])}
+      ${opt('vie','♥','Tipo '+DIAS[TYPES.vie.dow],['Niveles de '+TYPES.vie.min+' min','Rebuys hasta terminar 10-20','Puntos '+TYPES.vie.pts.join(' · '),'Premio '+TYPES.vie.split.join(' / ')])}
     </div>
     <div class="fields">
       <label><span class="label">Fecha</span><input type="date" id="nd-date" data-chg="nd" data-k="newDate" value="${date}"></label>
@@ -1084,7 +1155,7 @@ function renderBig(){
   if(Store.mode==='blocked'){w.innerHTML='';return}
   const [,g]=ui.big?currentGame():[];
   if(!ui.big){w.innerHTML='';return}
-  if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Torneo Poker Rotativo</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
+  if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
   const ts=tstate(g),t=TYPES[g.type],c=calc(g),vie=g.type==='vie',parts=g.parts||{};
   const {ctl,rb,clk,doneMsg,blindsNow,nextBl}=vTimer(g,ts,true);
   const players=c.playing.map(id=>({id,name:pname(id),p:c.parts[id],pl:c.place[id]})).sort((a,b)=>(a.pl||0)-(b.pl||0)||a.name.localeCompare(b.name,'es')).sort((a,b)=>(!!a.p.ko)-(!!b.p.ko));
@@ -1093,7 +1164,7 @@ function renderBig(){
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   w.innerHTML=`<div class="proj ${ts.done?'isdone':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
-      <div class="phead"><span class="brandp">Torneo Poker Rotativo</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min</span></div>
+      <div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min</span></div>
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
       <div><div class="plab">${ts.brk?'Descanso':'Ciegas'}</div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></div>
       ${doneMsg||(ts.running?'':`<div class="plab" style="color:var(--gold)">${ts.started?'En pausa':'Esperando para empezar'}</div>`)}
@@ -1170,10 +1241,10 @@ function vAdmin(){
   if(!isFB()||!isAdmin())return '';
   const l=[OWNER,...(ui.admins||[]).filter(x=>x!==OWNER)];
   return `<section class="card" data-suit="♠"><h2>Administración</h2>
-    ${Object.keys(S.players).length?'':`<div class="aviso"><b>La liga está vacía.</b> Traé los jugadores, puntos y partidas de la versión de claude.ai.<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`}
+    ${isOwner()&&!Object.keys(S.players).length?`<div class="aviso"><b>El torneo está vacío.</b> Creá los torneos, importá los datos y asigná jugadores desde la solapa ⚙️.</div>`:''}
     <p class="small muted" style="margin:0">Firu, Coco y Mosca son administradores entrando con su PIN. Los demás administradores entran con su cuenta de Google y pueden resetear PINs, cambiar la asistencia de cualquiera y borrar partidas o jugadores. Todo lo demás lo puede hacer cualquiera en la mesa.</p>
-    <ul class="small" style="margin:0;padding-left:18px">${l.map(e=>`<li>${esc(e)}${e===OWNER?' <span class="muted">(dueña)</span>':` · <button class="linkbtn" style="color:var(--red)" data-act="adminDel" data-v="${esc(e)}">quitar</button>`}</li>`).join('')}</ul>
-    <form class="row" data-form="adminAdd"><input type="text" id="adm-mail" placeholder="mail de Google" autocomplete="off" style="flex:1;min-width:180px"><button class="btn pri" type="submit">Agregar administrador</button></form>
+    <ul class="small" style="margin:0;padding-left:18px">${l.map(e=>`<li>${esc(e)}${e===OWNER?' <span class="muted">(dueña)</span>':isOwner()?` · <button class="linkbtn" style="color:var(--red)" data-act="adminDel" data-v="${esc(e)}">quitar</button>`:''}</li>`).join('')}</ul>
+    ${isOwner()?`<form class="row" data-form="adminAdd"><input type="text" id="adm-mail" placeholder="mail de Google" autocomplete="off" style="flex:1;min-width:180px"><button class="btn pri" type="submit">Agregar administrador</button></form>`:''}
   </section>`;
 }
 function vJugadores(){
@@ -1196,7 +1267,7 @@ function vJugadores(){
       return `<div class="prow">${name}<div class="row">
         ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Editar</button>`}
         <button class="btn" data-act="toggleActive" data-pid="${id}">${p.active===false?'Reactivar':'Retirar'}</button>
-        ${r.pj||p.prev||!isAdmin()?'':`<button class="btn danger ${armed?'armed':''}" data-act="delPlayer" data-pid="${id}">${armed?'¿Borrar?':'Borrar'}</button>`}
+        ${r.pj||prevOf(p)||!isAdmin()?'':`<button class="btn danger ${armed?'armed':''}" data-act="delPlayer" data-pid="${id}">${armed?'¿Borrar?':'Borrar'}</button>`}
         ${isFB()&&isAdmin()&&lock(id)?`<button class="btn ${ui.armed==='pinR-'+id?'armed':''}" data-act="pinReset" data-pid="${id}">${ui.armed==='pinR-'+id?'¿Resetear PIN?':'Resetear PIN'}</button>`:''}
       </div></div>`}).join('')}</div>`:`<p class="empty">Todavía no hay jugadores. Escribí un nombre y tocá Agregar.</p>`}
     ${isFB()?`<p class="small muted" style="margin:0">🔒 = ya tiene PIN. Para poner o usar el tuyo, elegí tu nombre en "¿Quién sos?" arriba a la derecha.${isAdmin()?' Si alguien se olvidó el PIN o se lo puso otro, tocá "Resetear PIN" y que lo cree de nuevo.':''}</p>`:''}
@@ -1207,7 +1278,7 @@ function vJugadores(){
 function vStats(){
   // "Por partido jugado": rendimiento sobre las veces que cada uno fue (sin la liga anterior, que no tiene partidas)
   const per=ui.statsMode==='pj',st=stats(ui.statsType,per);
-  const tabs=[['all','Todos'],['mie','Rápido'],['vie','Con rebuy']].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
+  const tabs=[['all','Todos'],['mie',TYPES.mie.name],['vie',TYPES.vie.name]].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
   const modes=[['total','Total'],['pj','Por partido jugado']].map(([k,l])=>`<button data-act="statsMode" data-v="${k}" aria-current="${(ui.statsMode||'total')===k}">${l}</button>`).join('');
   const dec=n=>n.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
   const pctOf=(a,b)=>b?Math.round(a/b*100)+'%':'—';
@@ -1291,11 +1362,81 @@ function vigente(){
   const open=openGames().filter(([,g])=>g.date>=ayer());
   return open.find(([,g])=>g.timer?.running)||open.find(([,g])=>tstate(g).started)||open.find(([,g])=>g.date===today())||null;
 }
+
+
+// Panel de la dueña: torneos (nombre, link, clave, tipos de partida, jugadores) y quién ya entró.
+function vPanel(){
+  if(!isOwner())return '';
+  const tours=ui.tours||{},allP=Object.entries(ui.allPlayers||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
+  const base=location.origin+location.pathname,link=tid=>base+'?t='+tid;
+  const mem=ui.members||[],ses=ui.sessions||[];
+  const fdate=t=>t?new Date(t).toLocaleDateString('es-AR',{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
+  const tcard=([tid,t])=>{
+    const open=ui.tourOpen===tid,n=allP.filter(([,p])=>p.ts&&p.ts[tid]).length,dev=mem.filter(x=>x.tid===tid&&x.v===t.keyV).length,ty=k=>({...TYPES0[k],...(t.types&&t.types[k]||{})});
+    const tf=(k,f,lab,val,extra='')=>`<label><span class="label">${lab}</span><input type="text" id="tt-${tid}-${k}-${f}" value="${esc(val)}" ${extra}></label>`;
+    return `<div class="tour ${tid===TID?'cur':''}">
+      <button class="cumhead" data-act="tourOpen" data-v="${tid}"><span class="av" style="width:40px;height:40px">${chipSvg(CHIPC[0],'♠')}</span>
+        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${dev} celulares entraron con la clave</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
+        <span class="small muted">${open?'Cerrar':'Editar ›'}</span></button>
+      ${open?`<div class="tbody">
+        <div class="row"><button class="btn" data-act="copyLink" data-v="${esc(link(tid))}">Copiar link</button><a class="btn" href="${esc(link(tid))}">Abrir</a></div>
+        <form data-form="tourEdit" data-tid="${tid}" class="edit">
+          <label><span class="label">Nombre del torneo</span><input type="text" id="te-${tid}-name" value="${esc(t.name||'')}" maxlength="40"></label>
+          <label><span class="label">Frase de la portada</span><input type="text" id="te-${tid}-sub" value="${esc(t.subtitle||'')}" placeholder="Miércoles rápido · Viernes SUM" maxlength="60"></label>
+          <label><span class="label">Dirección por defecto</span><input type="text" id="te-${tid}-place" value="${esc(t.place||'')}" maxlength="120"></label>
+          <label><span class="label">Link de Google Maps</span><input type="url" id="te-${tid}-map" value="${esc(t.map||'')}" placeholder="https://maps.app.goo.gl/…"></label>
+          ${['mie','vie'].map(k=>{const y=ty(k);return `<fieldset class="full ttype"><legend>${k==='mie'?'Partida con recompra (tipo miércoles)':'Partida con rebuy (tipo viernes)'}</legend><div class="edit">
+            ${tf(k,'name','Nombre',y.name,'maxlength="24"')}
+            <label><span class="label">Día</span><select id="tt-${tid}-${k}-dow">${DIAS.map((d,i)=>`<option value="${i}" ${+y.dow===i?'selected':''}>${d}</option>`).join('')}</select></label>
+            ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
+            ${tf(k,'pts','Puntos por puesto (ej. 7,3,1)',y.pts.join(','))}
+            ${tf(k,'split','Premio en % (ej. 60,30,10)',y.split.join(','))}
+          </div></fieldset>`}).join('')}
+          <div class="row full"><button class="btn pri" type="submit">Guardar cambios</button></div>
+        </form>
+        <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="Nueva clave" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">Cambiar clave</button></form>
+        <div class="row"><button class="btn ${ui.armed==='reask-'+tid?'armed':''}" data-act="tourReask" data-v="${tid}">${ui.armed==='reask-'+tid?'¿Seguro? Todos van a tener que ponerla otra vez':'Pedir la clave de nuevo a todos'}</button></div>
+        ${tid===TID&&!Object.keys(S.games).length?`<div class="aviso"><b>¿Traer los datos de claude.ai?</b> Jugadores, puntos anteriores y partidas del Rotativo.<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
+        <div class="label">Jugadores de este torneo</div>
+        <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" data-chg="tourPl" data-tid="${tid}" data-pid="${pid}" ${p.ts&&p.ts[tid]?'checked':''}>${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div>
+      </div>`:''}
+    </div>`;
+  };
+  const users=allP.map(([pid,p])=>{const ss=ses.filter(x=>x.pid===pid),last=Math.max(0,...ss.map(x=>x.at||0));
+    return `<tr><td><span class="who">${avatar(pid,22)}${esc(p.name)}</span></td><td>${ui.pinflags&&ui.pinflags.has(pid)?'🔒 '+fdate(ui.pinAt&&ui.pinAt[pid]):'<span class="muted">sin PIN</span>'}</td><td class="r">${ss.length||''}</td><td>${ss.length?fdate(last):''}</td><td class="small">${Object.keys(p.ts||{}).map(t=>esc((tours[t]&&tours[t].name)||t)).join(', ')}</td></tr>`}).join('');
+  const conPin=allP.filter(([pid])=>ui.pinflags&&ui.pinflags.has(pid)).length;
+  return `<section class="card" data-suit="♠"><h2>Torneos</h2>
+    ${tours[TID]?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo con el link <b>${esc(TID)}</b>.</div>`}
+    <div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>
+    <form data-form="tourNew" class="edit"><div class="label full">Nuevo torneo</div>
+      <label><span class="label">Nombre</span><input type="text" id="tn-name" placeholder="Ej.: Poker Rotativo" maxlength="40" ${tours[TID]?'':`value="${TID==='rotativo'?'Poker Rotativo':''}"`}></label>
+      <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="rotativo" maxlength="40" ${tours[TID]?'':`value="${esc(TID)}"`}></label>
+      <label><span class="label">Clave para entrar</span><input type="text" id="tn-key" autocomplete="off" placeholder="la que les vas a pasar"></label>
+      <div class="row full"><button class="btn pri" type="submit">Crear torneo</button></div></form>
+  </section>
+  <section class="card r" data-suit="♥"><h2>Usuarios</h2>
+    <p class="small muted" style="margin:0">${conPin} de ${allP.length} jugadores ya pusieron PIN. "Celulares" = en cuántos entraron con su PIN; "último ingreso" = la última vez que pusieron el PIN.</p>
+    <div class="tw"><table><thead><tr><th>Jugador</th><th>PIN</th><th class="r">Celulares</th><th>Último ingreso</th><th>Torneos</th></tr></thead><tbody>${users}</tbody></table></div>
+  </section>`;
+}
+
+// Pantalla de entrada al torneo: la primera vez, cada celular pone la clave que da la dueña.
+function vGate(){
+  if(ui.gate==='wait')return `<div class="card empty">Mezclando las cartas…</div>`;
+  if(ui.gate==='missing')return vPortada()+`<section class="card" data-suit="♠"><h2>Este torneo no existe</h2>
+    <p class="muted" style="margin:0">Revisá el link que te pasaron.${ui.fbEmail?'':' Si sos la organizadora, entrá como administradora (abajo de todo) para crearlo.'}</p></section>`;
+  return vPortada()+`<section class="card" data-suit="♠"><h2>Entrar al torneo</h2>
+    <p style="margin:0">Poné la clave del torneo <b>${esc(tourName())}</b>. Te la pasa quien organiza. Es una sola vez: después este celular queda habilitado.</p>
+    <form data-form="join" class="row"><input type="password" id="tkey" autocomplete="off" placeholder="Clave del torneo" style="flex:1;min-width:180px"><button class="btn pri" type="submit" ${ui.joinBusy?'disabled':''}>Entrar</button></form>
+    ${ui.joinErr?`<div class="err">${esc(ui.joinErr)}</div>`:''}
+  </section>`;
+}
+
 // Portada: nuestra mesa (paño rojo Pelayo, baranda negra, línea dorada) con cartas y fichas.
 function vPortada(){
   const card=(x,r,su,red)=>`<g transform="translate(${x} 124)"><rect width="30" height="42" rx="4" fill="#FFFDF7" stroke="#CFC6B4"/><text x="5" y="14" font-family="Playfair Display,Georgia,serif" font-weight="800" font-size="12" fill="${red?'#C1272D':'#1B1713'}">${r}</text><text x="15" y="33" text-anchor="middle" font-size="17" fill="${red?'#C1272D':'#1B1713'}">${su}</text></g>`;
   const chips=(x,cols)=>cols.map((c,i)=>`<g transform="translate(${x} ${178-i*6})"><ellipse cx="0" cy="0" rx="15" ry="6" fill="${c}"/><ellipse cx="0" cy="-2" rx="15" ry="6" fill="${c}" stroke="#FFF6EC" stroke-width="2" stroke-dasharray="5 5"/></g>`).join('');
-  return `<section class="hero" aria-label="Torneo Poker Rotativo">
+  return `<section class="hero" aria-label="Torneo ${esc(tourName())}">
     <svg viewBox="0 0 360 230" role="img" aria-hidden="true">
       <defs><pattern id="tw" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M0 0H7M0 0V7" stroke="#FF785F" stroke-opacity=".16" stroke-width="1"/></pattern>
         <linearGradient id="rl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3A3A"/><stop offset=".5" stop-color="#0C0C0C"/><stop offset="1" stop-color="#262626"/></linearGradient>
@@ -1306,7 +1447,7 @@ function vPortada(){
       ${chips(48,['#1B1713','#C1272D','#1F4FA8','#1B1713'])}${chips(312,['#17744B','#1B1713','#C1272D'])}
       ${card(107,'A','♠')}${card(141,'K','♥',1)}${card(175,'Q','♦',1)}${card(209,'J','♣')}${card(243,'10','♠')}
     </svg>
-    <div class="htx"><small>Torneo</small><b>Poker Rotativo</b><span>${soloVie()?'Viernes SUM':'Miércoles rápido · Viernes SUM'}</span></div>
+    <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${soloVie()?esc(TYPES.vie.name):esc(tourSub())}</span></div>
   </section>`;
 }
 function vInicio(){
@@ -1341,7 +1482,7 @@ function vInicio(){
       <p class="muted" style="margin:0">${open.length?`El próximo es el ${fmtDate(open[0][1].date)}${open[0][1].time?' a las '+esc(open[0][1].time):''}.`:'No hay partidos programados.'}</p>
       <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
   const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
-      return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>
+      return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${esc(TYPES[g.type].name)}</span>
         <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}${cumplesPartido(g).length?' · 🎂 '+cumplesPartido(g).map(x=>esc(pname(x.id))).join(', '):''}</span></span>
         <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
   const medal=['🥇','🥈','🥉'];
@@ -1349,7 +1490,7 @@ function vInicio(){
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
       const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('')+(r.ceb&&r.p1?`<span class="pod" style="color:var(--muted)">🧅 <span class="nm">${esc(pname(r.ceb))}</span></span>`:'');
       return `<button data-act="goGame" data-id="${id}">
-        <span class="phd"><span class="badge ${g.type}">${g.type==='mie'?'Rápido':'Rebuy'}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
+        <span class="phd"><span class="badge ${g.type}">${esc(TYPES[g.type].name)}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
@@ -1429,7 +1570,7 @@ const ACT={
     let first=null;
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
-      const id=uid('g'),g={type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
+      const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
         entry:prev.entry??'',food:'',foodMode:prev.foodMode||'total',foodPP:prev.foodMode==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
@@ -1506,6 +1647,9 @@ const ACT={
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{ui.editing=null;render()},
+  tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
+  copyLink:d=>{try{navigator.clipboard.writeText(d.v).then(()=>{ui.moveMsg=null;alert('Link copiado: '+d.v)})}catch{prompt('Copiá el link:',d.v)}},
+  tourReask:d=>{if(ui.armed!=='reask-'+d.v){arm('reask-'+d.v);return}ui.armed=null;const t=(ui.tours||{})[d.v];FB.saveTour(d.v,{keyV:(t&&t.keyV||1)+1}).catch(fail)},
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
   regPaid:d=>{const v=(S.regalos[d.rid]?.parts||{})[d.pid]||{};regSave(d.rid,{parts:{[d.pid]:{paid:!v.paid}}})},
   regSplit:d=>{const r=S.regalos[d.rid]||{},inn=Object.keys(r.parts||{}).filter(k=>r.parts[k].in);if(!r.monto||!inn.length)return;
@@ -1550,6 +1694,7 @@ const CHG={
   num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v})},
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid,g]=currentGame();if(canFinish(g))return;Store.update('games',gid,{time:el.value})},
+  tourPl:el=>{FB.setInTour(el.dataset.pid,el.dataset.tid,el.checked).catch(fail)},
   regMonto:el=>{const v=digits(el.value);regSave(el.dataset.rid,{monto:v===''?'':+v})},
   regAmt:el=>{const v=digits(el.value);regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{amt:v===''?'':+v}}})},
   regIn:el=>{regSave(el.dataset.rid,{parts:{[el.dataset.pid]:{in:el.checked}}})},
@@ -1567,7 +1712,8 @@ const CHG={
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(!b){return}
-  if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)&&!(b.dataset.act==='ko'&&ui.armed==='ko-'+b.dataset.pid)&&!(b.dataset.act==='pinReset'&&ui.armed==='pinR-'+b.dataset.pid)){ui.armed=null}
+  // un botón "armado" (pide confirmación) se desarma si se toca otra cosa; su segundo toque tiene que llegar armado
+  if(ui.armed&&b.dataset.act!==ui.armed&&!((b.dataset.pid||b.dataset.v)&&ui.armed.endsWith('-'+(b.dataset.pid||b.dataset.v)))){ui.armed=null}
   ACT[b.dataset.act]?.(b.dataset,b,e);
 });
 // formatea la plata mientras se escribe, con el cursor siempre al final
@@ -1580,9 +1726,37 @@ document.addEventListener('submit',e=>{
   if(f.dataset.form==='addPlayer'){
     const inp=$('#np-name'),name=inp.value.trim();if(!name)return;
     if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'.';render();return}
-    inp.value='';const nid=uid('p');Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now()}).then(()=>{
+    inp.value='';const nid=uid('p');Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now(),...(isFB()?{ts:{[TID]:{}}}:{})}).then(()=>{
       // en la versión pública, al crear un jugador se le propone crear su PIN (se puede cancelar si lo cargó otro)
       if(isFB()&&!me()){ui.pinFor=nid;ui.pinErr=null;render();return}const i=$('#np-name');i&&i.focus()});
+  }
+  if(f.dataset.form==='tourNew'){
+    const g=id=>(document.getElementById(id)||{}).value.trim(),name=g('tn-name'),tid=g('tn-id').toLowerCase(),key=g('tn-key');
+    if(!name||!/^[a-z0-9-]{2,40}$/.test(tid)){ui.err='Poné un nombre y un link con letras, números o guiones (ej.: amigos-club).';render();return}
+    if(!key){ui.err='Poné una clave para entrar al torneo.';render();return}
+    if((ui.tours||{})[tid]){ui.err='Ya existe un torneo con ese link.';render();return}
+    FB.saveTour(tid,{name,keyV:1,createdAt:Date.now(),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:JSON.parse(JSON.stringify(TYPES0))},key).then(()=>{ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
+    return;
+  }
+  if(f.dataset.form==='tourEdit'){
+    const tid=f.dataset.tid,g=id=>(document.getElementById(id)||{}).value.trim(),nums=v=>v.split(/[,; ]+/).filter(Boolean).map(Number);
+    const types={};for(const k of ['mie','vie']){const pts=nums(g(`tt-${tid}-${k}-pts`)),split=nums(g(`tt-${tid}-${k}-split`)),min=+g(`tt-${tid}-${k}-min`);
+      if(!pts.length||pts.some(isNaN)||!split.length||split.some(isNaN)||split.length!==pts.length||split.reduce((a,b)=>a+b,0)!==100||!(min>0)){ui.err=`Revisá "${g(`tt-${tid}-${k}-name`)}": minutos mayor a 0, y tantos puntos como porcentajes de premio, que sumen 100.`;render();return}
+      types[k]={name:g(`tt-${tid}-${k}-name`)||TYPES0[k].name,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split}}
+    const map=g(`te-${tid}-map`);if(map&&!safeUrl(map)){ui.err='El link de Maps tiene que empezar con https://';render();return}
+    FB.saveTour(tid,{name:g(`te-${tid}-name`)||tid,subtitle:g(`te-${tid}-sub`),place:g(`te-${tid}-place`),map,types}).then(()=>{ui.err=null;alert('Guardado')}).catch(fail);
+    return;
+  }
+  if(f.dataset.form==='tourKey'){
+    const tid=f.dataset.tid,k=(document.getElementById('tk-'+tid)||{}).value.trim();if(!k)return;
+    FB.saveTour(tid,{},k).then(()=>{alert('Clave cambiada. Los que ya entraron siguen adentro; si querés que la vuelvan a poner, tocá "Pedir la clave de nuevo".');render()}).catch(fail);
+    return;
+  }
+  if(f.dataset.form==='join'){
+    const k=(document.getElementById('tkey')||{}).value||'';if(!k.trim())return;
+    ui.joinBusy=true;ui.joinErr=null;render();
+    FB.join(k.trim()).then(()=>{ui.joinBusy=false;render()}).catch(e=>{ui.joinBusy=false;ui.joinErr=e.code==='permission-denied'?'Clave incorrecta.':'No se pudo ('+(e.code||e.message)+').';render()});
+    return;
   }
   if(f.dataset.form==='pin'){
     const pid=ui.pinFor,has=ui.pinflags&&ui.pinflags.has(pid),p1=(document.getElementById('pin1')||{}).value||'',p2=(document.getElementById('pin2')||{}).value||'';
