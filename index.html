@@ -602,8 +602,11 @@ const FB={
     const m=this.m,h=await sha(pid+':'+pin);
     if(isNew){const b=m.writeBatch(this.db);b.set(m.doc(this.db,'pins',pid),{h});b.set(m.doc(this.db,'pinflags',pid),{at:Date.now()});await b.commit()}
     await m.setDoc(m.doc(this.db,'sessions',this.user.uid),{pid,h,at:Date.now()});
+    // el servidor ya lo aceptó: no esperar al aviso del listener (Safari a veces tarda en mandarlo)
+    this.setSession(pid);
   },
-  async pinLogout(){await this.m.deleteDoc(this.m.doc(this.db,'sessions',this.user.uid))},
+  async pinLogout(){await this.m.deleteDoc(this.m.doc(this.db,'sessions',this.user.uid));this.setSession(null)},
+  setSession(pid){if(ui.session===pid)return;ui.session=pid;this.gate();this.watchRegalos();this.watchOwner()},
   async pinReset(pid){const m=this.m,b=m.writeBatch(this.db);b.delete(m.doc(this.db,'pins',pid));b.delete(m.doc(this.db,'pinflags',pid));await b.commit()},
   async adminLogin(){
     const m=this.m,prov=new m.GoogleAuthProvider();prov.setCustomParameters({prompt:'select_account'});
