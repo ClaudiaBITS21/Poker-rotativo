@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Torneo de Poker</title>
 <script>
-// GitHub Pages no conoce las direcciones de cada torneo (.../poker/rotativo): las manda a la app con ?t=<torneo>
-// y la app vuelve a mostrar la dirección original.
-var s=location.pathname.split('/').filter(Boolean);
-location.replace('/'+(s[0]?s[0]+'/':'')+(s[1]?'?t='+encodeURIComponent(s[1]):'')+location.hash);
+// GitHub Pages no conoce las direcciones de cada torneo (poker.rodo.es/rotativo o .../poker/rotativo): las manda a
+// la app con ?t=<torneo> y la app vuelve a mostrar la dirección original.
+var s=location.pathname.split('/').filter(Boolean),gh=/\.github\.io$/.test(location.hostname);
+var base=gh&&s[0]?'/'+s[0]+'/':'/',t=gh?s[1]:s[0];
+location.replace(base+(t?'?t='+encodeURIComponent(t):'')+location.hash);
 </script></head><body style="background:#6B1414"></body></html>

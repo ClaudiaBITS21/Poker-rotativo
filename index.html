@@ -500,9 +500,12 @@ const OWNER_PID='pmuhuxmb6f8rh'; // Firu (Claudia): dueña también entrando con
 // Torneo de este link (?t=...). Sin nada, el Rotativo.
 // Cada torneo tiene su link: en GitHub Pages es <sitio>/<repo>/<torneo> (ej. .../poker/rotativo); 404.html manda los
 // links de torneo a ?t=<torneo> y acá se vuelve a mostrar la dirección linda. En otros lados (pruebas) se usa ?t=.
-const PAGES=/\.github\.io$/.test(location.hostname),SEG=location.pathname.split('/').filter(Boolean);
-const APPBASE=PAGES&&SEG[0]?location.origin+'/'+SEG[0]+'/':null;
-const TID=(new URLSearchParams(location.search).get('t')||(PAGES&&SEG[1]&&!SEG[1].includes('.')?SEG[1]:'')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
+// Con dominio propio (poker.rodo.es) la app está en la raíz: poker.rodo.es/<torneo>.
+const DOMINIOS=['poker.rodo.es'];
+const PAGES=/\.github\.io$/.test(location.hostname),RAIZ=DOMINIOS.includes(location.hostname),SEG=location.pathname.split('/').filter(Boolean);
+const APPBASE=RAIZ?location.origin+'/':PAGES&&SEG[0]?location.origin+'/'+SEG[0]+'/':null;
+const PSEG=RAIZ?SEG[0]:PAGES?SEG[1]:'';
+const TID=(new URLSearchParams(location.search).get('t')||(PSEG&&!PSEG.includes('.')?PSEG:'')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
 const tourLink=tid=>APPBASE?APPBASE+tid:location.origin+location.pathname+'?t='+tid;
 if(APPBASE){try{const q=new URLSearchParams(location.search);q.delete('t');history.replaceState(null,'',APPBASE+TID+(q.toString()?'?'+q:'')+location.hash)}catch{}}
 // Lugar por defecto de las partidas de este torneo (cada partida lo puede cambiar)
