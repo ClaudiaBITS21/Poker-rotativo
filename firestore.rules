@@ -82,13 +82,17 @@ service cloud.firestore {
 
     // Jugadores (compartidos): los ven quienes entraron a algún torneo. Cualquiera de la mesa edita la ficha;
     // en qué torneos está cada uno (ts) solo lo cambia la dueña. Al crear uno, queda solo en tu torneo.
+    // El alias de Mercado Pago (mp) lo cambia solo el jugador con su PIN o un administrador.
     match /players/{pid} {
       allow read: if anyMember();
       allow create: if isOwner() || (anyMember()
         && request.resource.data.get('ts', {}).keys().size() == 1
         && isMember(request.resource.data.ts.keys()[0])
-        && request.resource.data.ts[request.resource.data.ts.keys()[0]].keys().size() == 0);
-      allow update: if isOwner() || (anyMember() && request.resource.data.get('ts', {}) == resource.data.get('ts', {}));
+        && request.resource.data.ts[request.resource.data.ts.keys()[0]].keys().size() == 0
+        && request.resource.data.get('mp', '') == '');
+      allow update: if isOwner() || (anyMember() && request.resource.data.get('ts', {}) == resource.data.get('ts', {})
+        && (request.resource.data.get('mp', '') == resource.data.get('mp', '') || isAdmin()
+            || (sessionOk() && myPid() == pid)));
       allow delete: if isAdmin();
     }
 
