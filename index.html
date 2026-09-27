@@ -1183,7 +1183,8 @@ function vGame(gid,g){
   ${c.playing.length?vKO(g,c,ts):''}
 
   <section class="card r" data-suit="♥">
-    <div class="row spread"><h2>Asistencia</h2><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span></div>
+    <div class="row spread"><h2>Asistencia</h2><span class="row" style="gap:8px"><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span>${closed?'':`<button class="btn mini" data-act="addPToggle">${ui.addingP?'Cerrar':'＋ Jugador'}</button>`}</span></div>
+    ${ui.addingP&&!closed?`<form class="row" data-form="addPlayerGame"><input type="text" id="npg-name" placeholder="Nombre del jugador nuevo" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" type="submit">Agregar${isFB()&&!isAdmin()?'':' y anotar'}</button></form>`:''}
     <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${isUna(g)?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':isLibre(g)?'<span><b>− +</b> rebuys</span>':''}</div>
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
   </section>
@@ -2030,6 +2031,7 @@ const ACT={
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
+  addPToggle:()=>{ui.addingP=!ui.addingP;render();if(ui.addingP)setTimeout(()=>{const i=$('#npg-name');i&&i.focus()})},
   userTour:d=>{ui.userTour=d.v;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
   tyAdd:d=>{const k='t'+Date.now().toString(36);ui.tkeys[d.tid]=[...ui.tkeys[d.tid],k];render()},
@@ -2138,6 +2140,17 @@ document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
   // si el formulario se aceptó (no apareció un error nuevo), lo escrito ya no es borrador
   const e0=ui.err;setTimeout(()=>{if(!ui.err||ui.err===e0)clearDrafts(f)});
+  if(f.dataset.form==='addPlayerGame'){
+    // jugador nuevo desde la partida: se suma al torneo y, si se puede, queda anotado como que juega
+    const inp=$('#npg-name'),name=inp.value.trim();if(!name)return;
+    if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'. Buscalo en la lista.';render();return}
+    const [gid]=currentGame(),nid=uid('p');ui.addingP=false;
+    Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now(),...(isFB()?{ts:{[TID]:{}}}:{})}).then(()=>{
+      if(!isFB()||isAdmin()){Store.update('games',gid,{parts:{[nid]:{st:'juega'}}});return}
+      if(!me()){ui.pinFor=nid;ui.pinErr=null;render();return}
+      ui.err=name+' ya está en el torneo. Para anotarlo, que elija su nombre y ponga su PIN (o que lo anote un administrador).';render()});
+    return;
+  }
   if(f.dataset.form==='addPlayer'){
     const inp=$('#np-name'),name=inp.value.trim();if(!name)return;
     if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'.';render();return}
