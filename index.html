@@ -1482,23 +1482,11 @@ function vigente(){
 
 
 // Panel de la dueña: torneos (nombre, link, clave, tipos de partida, jugadores) y quién ya entró.
-function vPanel(){
-  if(!isOwner())return '';
-  const tours=ui.tours||{},allP=Object.entries(ui.allPlayers||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
-  const link=tourLink;
-  const mem=ui.members||[],ses=ui.sessions||[];
-  const fdate=t=>t?new Date(t).toLocaleDateString('es-AR',{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
-  const tcard=([tid,t])=>{
-    const open=ui.tourOpen===tid,n=allP.filter(([,p])=>p.ts&&p.ts[tid]).length,dev=mem.filter(x=>x.tid===tid&&x.v===t.keyV).length,ty=k=>({...TYPES0[k],...(t.types&&t.types[k]||{})});
-    const tf=(k,f,lab,val,extra='')=>`<label><span class="label">${lab}</span><input type="text" id="tt-${tid}-${k}-${f}" value="${esc(val)}" ${extra}></label>`;
-    return `<div class="tour ${tid===TID?'cur':''}">
-      <button class="cumhead" data-act="tourOpen" data-v="${tid}"><span class="av" style="width:40px;height:40px">${chipSvg(CHIPC[0],'♠')}</span>
-        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${t.open?'sin clave: entra cualquiera con el link':dev+' celulares entraron con la clave'}</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
-        <span class="small muted">${open?'Cerrar':'Editar ›'}</span></button>
-      ${open?`<div class="tbody">
-        <div class="row"><button class="btn" data-act="copyLink" data-v="${esc(link(tid))}">Copiar link</button><a class="btn" href="${esc(link(tid))}">Abrir</a></div>
-        <form data-form="tourEdit" data-tid="${tid}" class="edit">
-          <label><span class="label">Nombre del torneo</span><input type="text" id="te-${tid}-name" value="${esc(t.name||'')}" maxlength="40"></label>
+// Campos de un torneo (nombre, portada, lugar y tipos de partida): los usan "Editar" y "Nuevo torneo".
+function tourFields(tid,t){
+  const ty=k=>({...TYPES0[k],...(t.types&&t.types[k]||{})});
+  const tf=(k,f,lab,val,extra='')=>`<label><span class="label">${lab}</span><input type="text" id="tt-${tid}-${k}-${f}" value="${esc(val)}" ${extra}></label>`;
+  return `<label><span class="label">Nombre del torneo</span><input type="text" id="te-${tid}-name" value="${esc(t.name||'')}" placeholder="Ej.: Amigos del club" maxlength="40"></label>
           <label><span class="label">Frase de la portada</span><input type="text" id="te-${tid}-sub" value="${esc(t.subtitle||'')}" placeholder="Miércoles rápido · Viernes SUM" maxlength="60"></label>
           <label><span class="label">Dirección por defecto</span><input type="text" id="te-${tid}-place" value="${esc(t.place||'')}" maxlength="120"></label>
           <label><span class="label">Link de Google Maps</span><input type="url" id="te-${tid}-map" value="${esc(t.map||'')}" placeholder="https://maps.app.goo.gl/…"></label>
@@ -1508,7 +1496,32 @@ function vPanel(){
             ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
             ${tf(k,'pts','Puntos por puesto (ej. 7,3,1)',y.pts.join(','))}
             ${tf(k,'split','Premio en % (ej. 60,30,10)',y.split.join(','))}
-          </div></fieldset>`}).join('')}
+          </div></fieldset>`}).join('')}`;
+}
+function readTour(tid){
+  const g=id=>(document.getElementById(id)||{}).value.trim(),nums=v=>v.split(/[,; ]+/).filter(Boolean).map(Number);
+  const types={};for(const k of ['mie','vie']){const pts=nums(g(`tt-${tid}-${k}-pts`)),split=nums(g(`tt-${tid}-${k}-split`)),min=+g(`tt-${tid}-${k}-min`);
+    if(!pts.length||pts.some(isNaN)||!split.length||split.some(isNaN)||split.length!==pts.length||split.reduce((a,b)=>a+b,0)!==100||!(min>0))return {err:`Revisá "${g(`tt-${tid}-${k}-name`)}": minutos mayor a 0, y tantos puntos como porcentajes de premio, que sumen 100.`};
+    types[k]={name:g(`tt-${tid}-${k}-name`)||TYPES0[k].name,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split}}
+  const map=g(`te-${tid}-map`);if(map&&!safeUrl(map))return {err:'El link de Maps tiene que empezar con https://'};
+  return {data:{name:g(`te-${tid}-name`),subtitle:g(`te-${tid}-sub`),place:g(`te-${tid}-place`),map,types}};
+}
+function vPanel(){
+  if(!isOwner())return '';
+  const tours=ui.tours||{},allP=Object.entries(ui.allPlayers||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
+  const link=tourLink;
+  const mem=ui.members||[],ses=ui.sessions||[];
+  const fdate=t=>t?new Date(t).toLocaleDateString('es-AR',{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
+  const tcard=([tid,t])=>{
+    const open=ui.tourOpen===tid,n=allP.filter(([,p])=>p.ts&&p.ts[tid]).length,dev=mem.filter(x=>x.tid===tid&&x.v===t.keyV).length;
+    return `<div class="tour ${tid===TID?'cur':''}">
+      <button class="cumhead" data-act="tourOpen" data-v="${tid}"><span class="av" style="width:40px;height:40px">${chipSvg(CHIPC[0],'♠')}</span>
+        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${t.open?'sin clave: entra cualquiera con el link':dev+' celulares entraron con la clave'}</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
+        <span class="small muted">${open?'Cerrar':'Editar ›'}</span></button>
+      ${open?`<div class="tbody">
+        <div class="row"><button class="btn" data-act="copyLink" data-v="${esc(link(tid))}">Copiar link</button><a class="btn" href="${esc(link(tid))}">Abrir</a></div>
+        <form data-form="tourEdit" data-tid="${tid}" class="edit">
+          ${tourFields(tid,t)}
           <div class="row full"><button class="btn pri" type="submit">Guardar cambios</button></div>
         </form>
         <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="${t.open?'Poner una clave':'Nueva clave (vacío = sin clave)'}" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">${t.open?'Poner clave':'Cambiar clave'}</button></form>
@@ -1522,14 +1535,21 @@ function vPanel(){
   const users=allP.map(([pid,p])=>{const ss=ses.filter(x=>x.pid===pid),last=Math.max(0,...ss.map(x=>x.at||0));
     return `<tr><td><span class="who">${avatar(pid,22)}${esc(p.name)}</span></td><td>${ui.pinflags&&ui.pinflags.has(pid)?'🔒 '+fdate(ui.pinAt&&ui.pinAt[pid]):'<span class="muted">sin PIN</span>'}</td><td class="r">${ss.length||''}</td><td>${ss.length?fdate(last):''}</td><td class="small">${Object.keys(p.ts||{}).map(t=>esc((tours[t]&&tours[t].name)||t)).join(', ')}</td></tr>`}).join('');
   const conPin=allP.filter(([pid])=>ui.pinflags&&ui.pinflags.has(pid)).length;
-  return `<section class="card" data-suit="♠"><h2>Torneos</h2>
-    ${tours[TID]?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo con el link <b>${esc(TID)}</b>.</div>`}
-    <div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>
-    <form data-form="tourNew" class="edit"><div class="label full">Nuevo torneo</div>
-      <label><span class="label">Nombre</span><input type="text" id="tn-name" placeholder="Ej.: Poker Rotativo" maxlength="40" ${tours[TID]?'':`value="${TID==='rotativo'?'Poker Rotativo':''}"`}></label>
-      <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="rotativo" maxlength="40" ${tours[TID]?'':`value="${esc(TID)}"`}></label>
+  const nuevoOpen=ui.tourNewOpen||!tours[TID];
+  const nuevo=nuevoOpen?`<form data-form="tourNew" class="edit">
+      <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="amigos-club" maxlength="40" value="${tours[TID]?'':esc(TID)}"></label>
       <label><span class="label">Clave para entrar (opcional)</span><input type="text" id="tn-key" autocomplete="off" placeholder="vacío = entra cualquiera con el link"></label>
-      <div class="row full"><button class="btn pri" type="submit">Crear torneo</button></div></form>
+      ${tourFields('_new',{name:tours[TID]?'':(TID==='rotativo'?'Poker Rotativo':''),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:TYPES0})}
+      <fieldset class="full ttype"><legend>Jugadores (se pueden sumar después)</legend>
+        <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" class="tn-pl" value="${pid}">${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div></fieldset>
+      <div class="row full"><button class="btn pri" type="submit">Crear torneo</button>${tours[TID]?'<button class="btn" type="button" data-act="tourNewToggle">Cancelar</button>':''}</div></form>`
+    :'';
+  return `${nuevoOpen?`<section class="card" data-suit="♦"><h2>Nuevo torneo</h2>
+    ${nuevo}
+  </section>`:''}
+  <section class="card" data-suit="♠"><div class="row spread"><h2>Torneos vigentes</h2>${nuevoOpen?'':'<button class="btn pri" data-act="tourNewToggle">＋ Nuevo torneo</button>'}</div>
+    ${tours[TID]?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo en "Nuevo torneo" con el link <b>${esc(TID)}</b>.</div>`}
+    ${Object.keys(tours).length?`<div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>`:'<p class="empty">Todavía no hay torneos.</p>'}
   </section>
   <section class="card r" data-suit="♥"><h2>Usuarios</h2>
     <p class="small muted" style="margin:0">${conPin} de ${allP.length} jugadores ya pusieron PIN. "Celulares" = en cuántos entraron con su PIN; "último ingreso" = la última vez que pusieron el PIN.</p>
@@ -1779,6 +1799,7 @@ const ACT={
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{ui.editing=null;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
+  tourNewToggle:()=>{ui.tourNewOpen=!ui.tourNewOpen;render()},
   copyLink:d=>{try{navigator.clipboard.writeText(d.v).then(()=>{ui.moveMsg=null;alert('Link copiado: '+d.v)})}catch{prompt('Copiá el link:',d.v)}},
   tourReask:d=>{if(ui.armed!=='reask-'+d.v){arm('reask-'+d.v);return}ui.armed=null;const t=(ui.tours||{})[d.v];FB.saveTour(d.v,{keyV:(t&&t.keyV||1)+1}).catch(fail)},
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
@@ -1872,19 +1893,19 @@ document.addEventListener('submit',e=>{
       if(isFB()&&!me()){ui.pinFor=nid;ui.pinErr=null;render();return}const i=$('#np-name');i&&i.focus()});
   }
   if(f.dataset.form==='tourNew'){
-    const g=id=>(document.getElementById(id)||{}).value.trim(),name=g('tn-name'),tid=g('tn-id').toLowerCase(),key=g('tn-key');
-    if(!name||!/^[a-z0-9-]{2,40}$/.test(tid)){ui.err='Poné un nombre y un link con letras, números o guiones (ej.: amigos-club).';render();return}
+    const tid=(document.getElementById('tn-id')||{}).value.trim().toLowerCase(),key=(document.getElementById('tn-key')||{}).value.trim();
+    const r=readTour('_new');if(r.err){ui.err=r.err;render();return}
+    if(!r.data.name||!/^[a-z0-9-]{2,40}$/.test(tid)){ui.err='Poné un nombre y un link con letras, números o guiones (ej.: amigos-club).';render();return}
     if((ui.tours||{})[tid]){ui.err='Ya existe un torneo con ese link.';render();return}
-    FB.saveTour(tid,{name,keyV:1,open:!key,createdAt:Date.now(),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:JSON.parse(JSON.stringify(TYPES0))},key).then(()=>{ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
+    const pls=[...document.querySelectorAll('.tn-pl:checked')].map(x=>x.value);
+    FB.saveTour(tid,{...r.data,keyV:1,open:!key,createdAt:Date.now()},key)
+      .then(()=>Promise.all(pls.map(pid=>FB.setInTour(pid,tid,true))))
+      .then(()=>{ui.tourNewOpen=false;ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
     return;
   }
   if(f.dataset.form==='tourEdit'){
-    const tid=f.dataset.tid,g=id=>(document.getElementById(id)||{}).value.trim(),nums=v=>v.split(/[,; ]+/).filter(Boolean).map(Number);
-    const types={};for(const k of ['mie','vie']){const pts=nums(g(`tt-${tid}-${k}-pts`)),split=nums(g(`tt-${tid}-${k}-split`)),min=+g(`tt-${tid}-${k}-min`);
-      if(!pts.length||pts.some(isNaN)||!split.length||split.some(isNaN)||split.length!==pts.length||split.reduce((a,b)=>a+b,0)!==100||!(min>0)){ui.err=`Revisá "${g(`tt-${tid}-${k}-name`)}": minutos mayor a 0, y tantos puntos como porcentajes de premio, que sumen 100.`;render();return}
-      types[k]={name:g(`tt-${tid}-${k}-name`)||TYPES0[k].name,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split}}
-    const map=g(`te-${tid}-map`);if(map&&!safeUrl(map)){ui.err='El link de Maps tiene que empezar con https://';render();return}
-    FB.saveTour(tid,{name:g(`te-${tid}-name`)||tid,subtitle:g(`te-${tid}-sub`),place:g(`te-${tid}-place`),map,types}).then(()=>{ui.err=null;alert('Guardado')}).catch(fail);
+    const tid=f.dataset.tid,r=readTour(tid);if(r.err){ui.err=r.err;render();return}
+    FB.saveTour(tid,{...r.data,name:r.data.name||tid}).then(()=>{ui.err=null;alert('Guardado')}).catch(fail);
     return;
   }
   if(f.dataset.form==='tourKey'){
