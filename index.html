@@ -523,7 +523,7 @@ const FB={
   listen(){
     const m=this.m;this.unsub.forEach(f=>f());this.unsub=[];this.stopData();
     const soft=()=>{};
-    this.unsub.push(m.onSnapshot(m.doc(this.db,'tournaments',TID),d=>{ui.tour=d.exists()?d.data():null;ui.tourLoaded=true;applyTour();this.gate()},e=>{ui.tourLoaded=true;ui.err='No se pudo abrir el torneo ('+e.code+').';this.gate()}));
+    this.unsub.push(m.onSnapshot(m.doc(this.db,'tournaments',TID),d=>{ui.tour=d.exists()?d.data():null;ui.tourLoaded=true;applyTour();this.gate()},e=>{ui.tourLoaded=true;ui.err=e.code==='permission-denied'?'El torneo todavía no está listo: la organizadora está terminando de configurarlo. Probá de nuevo en un rato.':'No se pudo abrir el torneo ('+e.code+').';this.gate()}));
     // solo cuenta lo que confirmó el servidor (una clave o un PIN incorrectos se ven un instante antes de ser rechazados)
     this.unsub.push(m.onSnapshot(m.doc(this.db,'members',TID+'_'+this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.memberV=d.exists()?d.data().v:null;this.gate()},()=>{ui.memberV=null;this.gate()}));
     this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),{includeMetadataChanges:true},d=>{if(d.metadata.hasPendingWrites)return;ui.session=d.exists()?d.data().pid:null;this.gate();this.watchRegalos();this.watchOwner()},()=>{ui.session=null;this.gate()}));
