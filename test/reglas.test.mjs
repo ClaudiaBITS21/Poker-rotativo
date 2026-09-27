@@ -105,4 +105,8 @@ await t('B avisa que pagó por MP',updateDoc(doc(P,'regpart','r1__pB'),{pay:'mp'
 await t('B no se cambia el alias',updateDoc(doc(P,'regpart','r1__pB'),{alias:'otro'}),false);
 await t('B cambia de opinión',updateDoc(doc(P,'regpart','r1__pB'),{in:false,at:2}),true);
 await t('B no ve el total del regalo',getDoc(doc(P,'regalos','r1')),false);
+// partidas que quedaron sin torneo (importación vieja)
+await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'games','gvieja'),{type:'mie',date:'2026-09-01',parts:{}})});
+await t('Pato no ve la partida sin torneo',getDoc(doc(P,'games','gvieja')),false);
+await t('dueña la arregla',setDoc(doc(G,'games','gvieja'),{type:'mie',date:'2026-09-01',parts:{},tid:'rot'}),true);
 console.log(`\n${ok} ok, ${bad} fallaron`);await env.cleanup();process.exit(bad?1:0);

@@ -140,13 +140,14 @@ service cloud.firestore {
 
     // Partidas de cada torneo. La maneja cualquiera que puso la clave; la asistencia (parts.<id>.st) de
     // cada jugador solo la cambia él mismo con su PIN, o un administrador.
+    // La dueña puede todo (incluso arreglar partidas que quedaron sin torneo).
     match /games/{gid} {
-      allow read: if isMember(resource.data.tid);
-      allow create: if isMember(request.resource.data.tid)
-        && (isAdmin() || request.resource.data.get('parts', {}).size() == 0);
-      allow update: if isMember(resource.data.tid) && request.resource.data.tid == resource.data.tid
-        && (isAdmin() || partsOk());
-      allow delete: if isAdmin() && isMember(resource.data.tid);
+      allow read: if isOwner() || isMember(resource.data.get('tid', ''));
+      allow create: if isOwner() || (isMember(request.resource.data.tid)
+        && (isAdmin() || request.resource.data.get('parts', {}).size() == 0));
+      allow update: if isOwner() || (isMember(resource.data.get('tid', '')) && request.resource.data.tid == resource.data.tid
+        && (isAdmin() || partsOk()));
+      allow delete: if isOwner() || (isAdmin() && isMember(resource.data.get('tid', '')));
     }
     // Cada cambio toca a lo sumo un jugador dentro de parts (la app lo indica en el campo _p);
     // si cambia su asistencia, tiene que ser él mismo.
