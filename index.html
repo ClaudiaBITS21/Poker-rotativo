@@ -1684,7 +1684,10 @@ function vPortada(){
   const order=h.seats.length>=6?['BL','BR','L','R','TL','TR']:['BC','L','R','TL','TR'];
   const nm=id=>{const n=pname(id);return n.length>11?n.slice(0,10)+'…':n};
   const seats=h.seats.map((x,i)=>{const [cx,cy,nx,ny,an]=P6[order[i]],w=h.win.includes(x.id);
-    return mini(cx,cy,x.cards[0],w)+mini(cx+16,cy,x.cards[1],w)+`<text x="${nx}" y="${ny}" text-anchor="${an}" font-family="Figtree,system-ui,sans-serif" font-weight="${w?800:600}" font-size="8.5" fill="${w?'#FAE8B4':'#FFF6EC'}" stroke="#1B0806" stroke-width="2.4" paint-order="stroke">${w?'★ ':''}${esc(nm(x.id))}</text>`}).join('');
+    // las cartas del ganador, un poco más grandes (y el nombre corrido para no pisarlas)
+    const pair=mini(cx,cy,x.cards[0],w)+mini(cx+16,cy,x.cards[1],w),ox=cx+15,oy=cy+9.5;
+    const nx2=w?(an==='end'?nx-5:an==='start'?nx+5:nx):nx,ny2=w&&an==='middle'?ny+4:ny;
+    return (w?`<g transform="translate(${ox} ${oy}) scale(1.3) translate(${-ox} ${-oy})">${pair}</g>`:pair)+`<text x="${nx2}" y="${ny2}" text-anchor="${an}" font-family="Figtree,system-ui,sans-serif" font-weight="${w?800:600}" font-size="8.5" fill="${w?'#FAE8B4':'#FFF6EC'}" stroke="#1B0806" stroke-width="2.4" paint-order="stroke">${w?'★ ':''}${esc(nm(x.id))}</text>`}).join('');
   const cap=h.win.length?(h.win.length===1?`Gana ${esc(nm(h.win[0]))} con ${handName(h.top)}`:`Empate con ${handName(h.top)}`):'';
   const b=h.board,xs=[91,123,155,197,239];
   return `<section class="hero" aria-label="Torneo ${esc(tourName())}">
