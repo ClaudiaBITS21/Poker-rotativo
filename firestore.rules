@@ -78,12 +78,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
       allow update: if isAdmin() || (signedIn() && partsOk());
     }
-    // Cada cambio toca a lo sumo un jugador dentro de parts; si cambia su asistencia, tiene que ser él.
+    // Cada cambio toca a lo sumo un jugador dentro de parts (la app lo indica en el campo _p);
+    // si cambia su asistencia, tiene que ser él mismo.
     function partsOk() {
       let before = resource.data.get('parts', {});
       let after = request.resource.data.get('parts', {});
+      let k = request.resource.data.get('_p', '');
       let ch = after.diff(before).affectedKeys();
-      return ch.size() == 0 || (ch.size() == 1 && stOk(ch.toList()[0], before, after));
+      return ch.size() == 0 || (ch.hasOnly([k]) && stOk(k, before, after));
     }
     function stOk(k, before, after) {
       return after.get(k, {}).get('st', '') == before.get(k, {}).get('st', '')

@@ -291,7 +291,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .hero .htx small{font-family:var(--num);font-weight:600;letter-spacing:.5em;text-transform:uppercase;font-size:clamp(10px,3vw,14px);color:var(--gold-hi);text-shadow:0 1px 2px #000}
 .hero .htx b{font-family:var(--show);font-weight:400;font-size:clamp(26px,8.6vw,46px);line-height:1.1;margin-top:2px;color:var(--gold-hi);text-shadow:0 2px 0 #3D0B08,0 4px 10px rgba(0,0,0,.6)}
 .hero .htx span{position:absolute;bottom:.5%;font-family:var(--num);font-size:clamp(10px,2.8vw,13px);letter-spacing:.14em;text-transform:uppercase;color:var(--on-felt)}
-.hand{display:inline-flex;gap:2px;vertical-align:-3px;margin-left:2px}
+.hand{display:inline-flex;gap:2px;vertical-align:middle;position:relative;top:-.12em;margin-left:2px}
 .mc{display:inline-flex;align-items:center;gap:1px;height:18px;min-width:17px;padding:0 3px;border-radius:3px;background:#FFFDF7;border:1px solid #CFC6B4;color:#1B1713;font-family:var(--num);font-weight:600;font-size:11px;line-height:1;box-shadow:0 1px 1px rgba(0,0,0,.25);font-style:normal}
 .mc i{font-style:normal;font-size:10px}
 .mc.red{color:#C1272D}
@@ -482,7 +482,10 @@ const FB={
     this.unsub.push(m.onSnapshot(m.doc(this.db,'sessions',this.user.uid),d=>{ui.session=d.exists()?d.data().pid:null;render()},()=>{ui.session=null}));
   },
   set(c,id,data){return this.m.setDoc(this.m.doc(this.db,c,id),clean(data))},
-  update(c,id,patch){return this.m.updateDoc(this.m.doc(this.db,c,id),clean(flatten(patch)))},
+  update(c,id,patch){
+    // las reglas piden saber a qué jugador toca un cambio dentro de parts
+    if(c==='games'&&patch.parts){const ks=Object.keys(patch.parts);if(ks.length===1)patch={...patch,_p:ks[0]}}
+    return this.m.updateDoc(this.m.doc(this.db,c,id),clean(flatten(patch)))},
   del(c,id){return this.m.deleteDoc(this.m.doc(this.db,c,id))},
   // Entrar como jugador: si ya tiene PIN se valida contra el hash (lo hace Firebase con las reglas); si no, se crea.
   async pinLogin(pid,pin,isNew){
@@ -576,8 +579,9 @@ function handCards(h){
   const suits=a===b?[['♥',1],['♠',0]]:off?[['♠',0],['♥',1]]:[['♠',0],['♠',0]];
   return `<span class="hand" title="${esc(h)}">${[a,b].map((x,i)=>`<span class="mc ${suits[i][1]?'red':''}">${show(x)}<i>${suits[i][0]}</i></span>`).join('')}</span>`;
 }
-const ptag=id=>{const p=S.players[id]||{},c=handCards(p.hand),t=p.hand&&!c?p.hand:'',x=[t,p.phrase].filter(Boolean).join(' · ');
-  return (c?' '+c:'')+(x?` <span class="ptxt">(${esc(x)})</span>`:'')};
+const ptag=id=>{const p=S.players[id]||{},c=handCards(p.hand),t=p.hand&&!c?p.hand:'';
+  const f=p.phrase?`“${esc(p.phrase)}”`:'';
+  return (c?' '+c:'')+(t?` <span class="ptxt">${esc(t)}</span>`:'')+(f?` <span class="ptxt">${f}</span>`:'')};
 const sortedPlayers=()=>Object.entries(S.players).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
 function nextDow(dow){const d=new Date();d.setDate(d.getDate()+(dow-d.getDay()+7)%7);return ymd(d)}
 const me=()=>{const id=isFB()?ui.session:ui.me;return id&&S.players[id]?id:null};
@@ -1438,7 +1442,9 @@ document.addEventListener('submit',e=>{
   if(f.dataset.form==='addPlayer'){
     const inp=$('#np-name'),name=inp.value.trim();if(!name)return;
     if(Object.values(S.players).some(p=>p.name.toLowerCase()===name.toLowerCase())){ui.err='Ya hay un jugador llamado '+name+'.';render();return}
-    inp.value='';Store.set('players',uid('p'),{name,active:true,since:today(),createdAt:Date.now()}).then(()=>{const i=$('#np-name');i&&i.focus()});
+    inp.value='';const nid=uid('p');Store.set('players',nid,{name,active:true,since:today(),createdAt:Date.now()}).then(()=>{
+      // en la versión pública, al crear un jugador se le propone crear su PIN (se puede cancelar si lo cargó otro)
+      if(isFB()&&!me()){ui.pinFor=nid;ui.pinErr=null;render();return}const i=$('#np-name');i&&i.focus()});
   }
   if(f.dataset.form==='pin'){
     const pid=ui.pinFor,has=ui.pinflags&&ui.pinflags.has(pid),p1=(document.getElementById('pin1')||{}).value||'',p2=(document.getElementById('pin2')||{}).value||'';
