@@ -498,7 +498,13 @@ const FBV='https://www.gstatic.com/firebasejs/10.14.1/';
 const OWNER='claudia@rodo.es';
 const OWNER_PID='pmuhuxmb6f8rh'; // Firu (Claudia): dueña también entrando con su PIN
 // Torneo de este link (?t=...). Sin nada, el Rotativo.
-const TID=(new URLSearchParams(location.search).get('t')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
+// Cada torneo tiene su link: en GitHub Pages es <sitio>/<repo>/<torneo> (ej. .../poker/rotativo); 404.html manda los
+// links de torneo a ?t=<torneo> y acá se vuelve a mostrar la dirección linda. En otros lados (pruebas) se usa ?t=.
+const PAGES=/\.github\.io$/.test(location.hostname),SEG=location.pathname.split('/').filter(Boolean);
+const APPBASE=PAGES&&SEG[0]?location.origin+'/'+SEG[0]+'/':null;
+const TID=(new URLSearchParams(location.search).get('t')||(PAGES&&SEG[1]&&!SEG[1].includes('.')?SEG[1]:'')||'rotativo').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40)||'rotativo';
+const tourLink=tid=>APPBASE?APPBASE+tid:location.origin+location.pathname+'?t='+tid;
+if(APPBASE){try{const q=new URLSearchParams(location.search);q.delete('t');history.replaceState(null,'',APPBASE+TID+(q.toString()?'?'+q:'')+location.hash)}catch{}}
 // Lugar por defecto de las partidas de este torneo (cada partida lo puede cambiar)
 const LUGAR={place:'Eduardo Acevedo 29',map:'https://maps.app.goo.gl/UN5vwaNmuBCdKpTc6'}; // se reemplaza por el del torneo
 // update() de Firestore reemplaza los mapas enteros: se pasa a rutas con puntos ("parts.p1.st") para mezclar como antes.
@@ -1455,7 +1461,7 @@ function vigente(){
 function vPanel(){
   if(!isOwner())return '';
   const tours=ui.tours||{},allP=Object.entries(ui.allPlayers||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
-  const base=location.origin+location.pathname,link=tid=>tid==='rotativo'?base:base+'?t='+tid;
+  const link=tourLink;
   const mem=ui.members||[],ses=ui.sessions||[];
   const fdate=t=>t?new Date(t).toLocaleDateString('es-AR',{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
   const tcard=([tid,t])=>{
