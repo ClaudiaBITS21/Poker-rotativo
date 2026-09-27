@@ -533,6 +533,8 @@ const FB={
     const ok=isOwner()||!!(ui.tour&&ui.memberV!=null&&ui.memberV===ui.tour.keyV);
     ui.gate=!ui.tourLoaded?'wait':ok?'ok':!ui.tour?'missing':'key';
     if(ok&&!this.dataOn)this.startData();else if(!ok&&this.dataOn)this.stopData();
+    // torneo sin clave: alcanza con tener el link (se entra con la clave vacía)
+    if(ui.gate==='key'&&ui.tour.open&&ui.autoJoin!==ui.tour.keyV){ui.autoJoin=ui.tour.keyV;this.join('').catch(e=>{ui.err='No se pudo entrar al torneo ('+e.code+').';render()})}
     if(ui.gate!=='ok')ui.loaded=true;
     render();
   },
@@ -566,7 +568,7 @@ const FB={
   async saveTour(tid,data,key){
     const m=this.m,b=m.writeBatch(this.db);
     b.set(m.doc(this.db,'tournaments',tid),clean(data),{merge:true});
-    if(key)b.set(m.doc(this.db,'tkeys',tid),{h:await sha(tid+':'+key)});
+    if(typeof key==='string')b.set(m.doc(this.db,'tkeys',tid),{h:await sha(tid+':'+key)});
     await b.commit();
   },
   setInTour(pid,tid,on){const m=this.m;return m.updateDoc(m.doc(this.db,'players',pid),{['ts.'+tid]:on?{}:m.deleteField()})},
@@ -1453,7 +1455,7 @@ function vigente(){
 function vPanel(){
   if(!isOwner())return '';
   const tours=ui.tours||{},allP=Object.entries(ui.allPlayers||{}).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
-  const base=location.origin+location.pathname,link=tid=>base+'?t='+tid;
+  const base=location.origin+location.pathname,link=tid=>tid==='rotativo'?base:base+'?t='+tid;
   const mem=ui.members||[],ses=ui.sessions||[];
   const fdate=t=>t?new Date(t).toLocaleDateString('es-AR',{day:'numeric',month:'short'})+' '+new Date(t).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'—';
   const tcard=([tid,t])=>{
@@ -1461,7 +1463,7 @@ function vPanel(){
     const tf=(k,f,lab,val,extra='')=>`<label><span class="label">${lab}</span><input type="text" id="tt-${tid}-${k}-${f}" value="${esc(val)}" ${extra}></label>`;
     return `<div class="tour ${tid===TID?'cur':''}">
       <button class="cumhead" data-act="tourOpen" data-v="${tid}"><span class="av" style="width:40px;height:40px">${chipSvg(CHIPC[0],'♠')}</span>
-        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${dev} celulares entraron con la clave</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
+        <span><b>${esc(t.name||tid)}</b>${tid===TID?' <span class="badge gold" style="font-size:10px">este link</span>':''}<span class="small muted" style="display:block">${n} jugadores · ${t.open?'sin clave: entra cualquiera con el link':dev+' celulares entraron con la clave'}</span><span class="small" style="display:block;word-break:break-all">${esc(link(tid))}</span></span>
         <span class="small muted">${open?'Cerrar':'Editar ›'}</span></button>
       ${open?`<div class="tbody">
         <div class="row"><button class="btn" data-act="copyLink" data-v="${esc(link(tid))}">Copiar link</button><a class="btn" href="${esc(link(tid))}">Abrir</a></div>
@@ -1479,8 +1481,8 @@ function vPanel(){
           </div></fieldset>`}).join('')}
           <div class="row full"><button class="btn pri" type="submit">Guardar cambios</button></div>
         </form>
-        <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="Nueva clave" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">Cambiar clave</button></form>
-        <div class="row"><button class="btn ${ui.armed==='reask-'+tid?'armed':''}" data-act="tourReask" data-v="${tid}">${ui.armed==='reask-'+tid?'¿Seguro? Todos van a tener que ponerla otra vez':'Pedir la clave de nuevo a todos'}</button></div>
+        <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="${t.open?'Poner una clave':'Nueva clave (vacío = sin clave)'}" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">${t.open?'Poner clave':'Cambiar clave'}</button></form>
+        ${t.open?'':`<div class="row"><button class="btn ${ui.armed==='reask-'+tid?'armed':''}" data-act="tourReask" data-v="${tid}">${ui.armed==='reask-'+tid?'¿Seguro? Todos van a tener que ponerla otra vez':'Pedir la clave de nuevo a todos'}</button></div>`}
         ${tid===TID&&!Object.keys(S.games).length?`<div class="aviso"><b>¿Traer los datos de claude.ai?</b> Jugadores, puntos anteriores y partidas del Rotativo.<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
         <div class="label">Jugadores de este torneo</div>
         <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" data-chg="tourPl" data-tid="${tid}" data-pid="${pid}" ${p.ts&&p.ts[tid]?'checked':''}>${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div>
@@ -1496,7 +1498,7 @@ function vPanel(){
     <form data-form="tourNew" class="edit"><div class="label full">Nuevo torneo</div>
       <label><span class="label">Nombre</span><input type="text" id="tn-name" placeholder="Ej.: Poker Rotativo" maxlength="40" ${tours[TID]?'':`value="${TID==='rotativo'?'Poker Rotativo':''}"`}></label>
       <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="rotativo" maxlength="40" ${tours[TID]?'':`value="${esc(TID)}"`}></label>
-      <label><span class="label">Clave para entrar</span><input type="text" id="tn-key" autocomplete="off" placeholder="la que les vas a pasar"></label>
+      <label><span class="label">Clave para entrar (opcional)</span><input type="text" id="tn-key" autocomplete="off" placeholder="vacío = entra cualquiera con el link"></label>
       <div class="row full"><button class="btn pri" type="submit">Crear torneo</button></div></form>
   </section>
   <section class="card r" data-suit="♥"><h2>Usuarios</h2>
@@ -1510,6 +1512,7 @@ function vGate(){
   if(ui.gate==='wait')return `<div class="card empty">Mezclando las cartas…</div>`;
   if(ui.gate==='missing')return vPortada()+`<section class="card" data-suit="♠"><h2>Este torneo no existe</h2>
     <p class="muted" style="margin:0">Revisá el link que te pasaron.${ui.fbEmail?'':' Si sos la organizadora, entrá como administradora (abajo de todo) para crearlo.'}</p></section>`;
+  if(ui.tour&&ui.tour.open)return vPortada()+`<section class="card"><p class="empty">Entrando al torneo…</p></section>`;
   return vPortada()+`<section class="card" data-suit="♠"><h2>Entrar al torneo</h2>
     <p style="margin:0">Poné la clave del torneo <b>${esc(tourName())}</b>. Te la pasa quien organiza. Es una sola vez: después este celular queda habilitado.</p>
     <form data-form="join" class="row"><input type="password" id="tkey" autocomplete="off" placeholder="Clave del torneo" style="flex:1;min-width:180px"><button class="btn pri" type="submit" ${ui.joinBusy?'disabled':''}>Entrar</button></form>
@@ -1829,9 +1832,8 @@ document.addEventListener('submit',e=>{
   if(f.dataset.form==='tourNew'){
     const g=id=>(document.getElementById(id)||{}).value.trim(),name=g('tn-name'),tid=g('tn-id').toLowerCase(),key=g('tn-key');
     if(!name||!/^[a-z0-9-]{2,40}$/.test(tid)){ui.err='Poné un nombre y un link con letras, números o guiones (ej.: amigos-club).';render();return}
-    if(!key){ui.err='Poné una clave para entrar al torneo.';render();return}
     if((ui.tours||{})[tid]){ui.err='Ya existe un torneo con ese link.';render();return}
-    FB.saveTour(tid,{name,keyV:1,createdAt:Date.now(),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:JSON.parse(JSON.stringify(TYPES0))},key).then(()=>{ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
+    FB.saveTour(tid,{name,keyV:1,open:!key,createdAt:Date.now(),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:JSON.parse(JSON.stringify(TYPES0))},key).then(()=>{ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
     return;
   }
   if(f.dataset.form==='tourEdit'){
@@ -1844,8 +1846,10 @@ document.addEventListener('submit',e=>{
     return;
   }
   if(f.dataset.form==='tourKey'){
-    const tid=f.dataset.tid,k=(document.getElementById('tk-'+tid)||{}).value.trim();if(!k)return;
-    FB.saveTour(tid,{},k).then(()=>{alert('Clave cambiada. Los que ya entraron siguen adentro; si querés que la vuelvan a poner, tocá "Pedir la clave de nuevo".');render()}).catch(fail);
+    const tid=f.dataset.tid,k=(document.getElementById('tk-'+tid)||{}).value.trim(),t=(ui.tours||{})[tid]||{};
+    if(!k&&(t.open||!confirm('¿Sacarle la clave? Va a poder entrar cualquiera que tenga el link.')))return;
+    // al poner clave a un torneo abierto, se le pide a todos (sube keyV)
+    FB.saveTour(tid,k?{open:false,...(t.open?{keyV:(t.keyV||1)+1}:{})}:{open:true},k).then(()=>{alert(!k?'Listo: ahora entra cualquiera con el link.':t.open?'Clave puesta: todos la van a tener que poner.':'Clave cambiada. Los que ya entraron siguen adentro; si querés que la vuelvan a poner, tocá "Pedir la clave de nuevo".');render()}).catch(fail);
     return;
   }
   if(f.dataset.form==='join'){
