@@ -1,5 +1,5 @@
 rules_version = '2';
-// Reglas de la Liga de Poker (Firestore). Se pegan en Firebase → Firestore Database → Reglas.
+// Reglas del Torneo Poker Rotativo (Firestore). Se pegan en Firebase → Firestore Database → Reglas.
 //
 // - Todos entran sin cuenta (sesión anónima), ven la liga y pueden manejar la partida y los jugadores.
 // - La asistencia de cada jugador solo la cambia él mismo con su PIN. El PIN nunca se guarda en
