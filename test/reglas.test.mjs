@@ -101,6 +101,8 @@ await t('B ve su monto',getDoc(doc(P,'regpart','r1__pB')),true);
 await t('B busca los suyos',getDocs(query(collection(P,'regpart'),where('pid','==','pB'))),true);
 await t('B no lista los de todos',getDocs(collection(P,'regpart')),false);
 await t('B no se marca pagado',updateDoc(doc(P,'regpart','r1__pB'),{paid:true}),false);
+await t('B avisa que pagó por MP',updateDoc(doc(P,'regpart','r1__pB'),{pay:'mp',payAt:3}),true);
+await t('B no se cambia el alias',updateDoc(doc(P,'regpart','r1__pB'),{alias:'otro'}),false);
 await t('B cambia de opinión',updateDoc(doc(P,'regpart','r1__pB'),{in:false,at:2}),true);
 await t('B no ve el total del regalo',getDoc(doc(P,'regalos','r1')),false);
 console.log(`\n${ok} ok, ${bad} fallaron`);await env.cleanup();process.exit(bad?1:0);

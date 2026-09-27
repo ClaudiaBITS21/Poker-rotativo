@@ -339,7 +339,9 @@ tfoot td{font-weight:700;border-bottom:0}
 
 /* ---- selector de avatar ---- */
 .resp{font-style:normal;font-size:11px;font-weight:600;color:var(--muted)}.resp.si{color:var(--green)}.resp.no{color:var(--red)}
-.regmine{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}.regmine:first-of-type{border-top:0}
+.resp.pay{color:var(--gold-2)}
+.regmine{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.alias{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px dashed var(--gold-2);border-radius:10px;background:#FFF8EC}.alias .small{flex-basis:100%}.alias b{font-size:17px;word-break:break-all;flex:1}.regmine:first-of-type{border-top:0}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -737,6 +739,7 @@ async function fileToAvatar(file){
 /* ---------- regalos: aviso a los de los miércoles y lo que le toca poner a cada uno ---------- */
 const GIFT_DAYS=21;
 const esMie=p=>p&&p.active!==false&&p.days!=='vie';
+const mpAlias=()=>S.regalos._mp?.alias||'';
 function snoozed(rid){if(ui.snooze&&ui.snooze[rid])return true;try{return localStorage.getItem('poker.snooze.'+rid)===today()}catch{return false}}
 // Cumpleaños de los miércoles en las próximas 3 semanas que este jugador todavía no contestó
 function giftPending(){
@@ -752,7 +755,34 @@ function giftPending(){
   }
   return out.sort((a,b)=>a.days-b.days)[0]||null;
 }
+// Regalos en los que estás anotado, con fecha y nombre del cumpleañero (hasta 30 días después del cumple)
+function misRegalos(){
+  const m=me();if(!m)return [];
+  return Object.values(S.regpart).filter(x=>x.pid===m&&x.in).map(x=>{
+    const i=x.rid.lastIndexOf('_'),cid=x.rid.slice(0,i),p=S.players[cid]||ui.allPlayers?.[cid];if(!p||!p.bday)return null;
+    const [mm,dd]=p.bday.split('-').map(Number),d=new Date(+x.rid.slice(i+1),mm-1,dd);
+    const diff=Math.round((d-parseYmd(today()))/864e5);if(diff<-30||diff>GIFT_DAYS)return null;
+    return {x,p,d,diff};
+  }).filter(Boolean).sort((a,b)=>a.d-b.d);
+}
+const aliasBox=a=>a?`<div class="alias"><span class="small muted">Alias de Mercado Pago</span><b>${esc(a)}</b><button class="btn" data-act="copyAlias" data-v="${esc(a)}">${ui.copied===a?'Copiado ✓':'Copiar'}</button></div>`:'';
+// Ya se definió cuánto pone y todavía no dijo cómo paga
+function renderPay(w){
+  const g=misRegalos().find(({x})=>x.amt&&!x.paid&&!x.pay&&!snoozed('pay.'+x.rid));if(!g)return false;
+  const {x,p}=g;
+  w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Pago del regalo">
+    <h2>🎁 Regalo para ${esc(p.name)}</h2>
+    <p style="margin:0">Ya se definió el regalo: te toca poner <b style="font-size:20px">${money(x.amt)}</b>.</p>
+    ${aliasBox(x.alias)}
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn pri" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button>
+      <button class="btn" data-act="giftPay" data-v="partido" data-rid="${x.rid}">Pago en el partido</button>
+      <button class="btn" style="color:var(--muted)" data-act="giftPayLater" data-rid="${x.rid}">Después</button>
+    </div></section></div>`;
+  return true;
+}
 function renderGift(w){
+  if(renderPay(w))return true;
   const g=giftPending();if(!g)return false;
   const cu=g.days===0?'hoy':g.days===1?'mañana':'el '+g.date.getDate()+' de '+MESES[g.date.getMonth()]+' (en '+g.days+' días)';
   w.innerHTML=`<div class="modal"><section class="card" data-suit="♥" role="dialog" aria-modal="true" aria-label="Regalo de cumpleaños">
@@ -767,16 +797,11 @@ function renderGift(w){
 }
 // Tarjeta en Inicio con los regalos en los que estás anotado y cuánto te toca
 function vMisRegalos(){
-  const m=me();if(!m)return '';
-  const items=Object.values(S.regpart).filter(x=>x.pid===m&&x.in).map(x=>{
-    const cid=x.rid.slice(0,x.rid.lastIndexOf('_')),p=S.players[cid]||ui.allPlayers?.[cid];if(!p||!p.bday)return null;
-    const [mm,dd]=p.bday.split('-').map(Number),y=+x.rid.slice(x.rid.lastIndexOf('_')+1),d=new Date(y,mm-1,dd);
-    const t=parseYmd(today()),diff=Math.round((d-t)/864e5);if(diff<-30||diff>GIFT_DAYS)return null;
-    return {x,p,d,diff};
-  }).filter(Boolean).sort((a,b)=>a.d-b.d);
-  if(!items.length)return '';
+  const items=misRegalos();if(!items.length)return '';
+  const estado=x=>x.paid?'<span class="resp si">Pagado ✓</span>':x.pay==='mp'?'<span class="resp pay">Avisaste que pagaste por MP · falta que lo confirmen</span>':x.pay==='partido'?'<span class="resp pay">Pagás en el partido</span>':'<span class="resp no">Pendiente</span>';
   return `<section class="card" data-suit="♥"><h2>🎁 Regalos</h2>${items.map(({x,p,d})=>`<div class="regmine"><div><b>${esc(p.name)}</b> <span class="small muted">· cumple ${d.getDate()} ${MESES[d.getMonth()]}</span></div>
-    <div>${x.amt?`Te toca poner <b>${money(x.amt)}</b> · ${x.paid?'<span class="resp si">Pagado ✓</span>':'<span class="resp no">Pendiente</span>'}`:'<span class="small muted">Anotado. Todavía no se definió cuánto pone cada uno.</span>'}</div></div>`).join('')}</section>`;
+    <div>${x.amt?`Te toca poner <b>${money(x.amt)}</b> · ${estado(x)}`:'<span class="small muted">Anotado. Todavía no se definió cuánto pone cada uno.</span>'}</div>
+    ${x.amt&&!x.paid&&x.pay!=='mp'?`${aliasBox(x.alias)}<div class="row"><button class="btn" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button>${x.pay?'':`<button class="btn" data-act="giftPay" data-v="partido" data-rid="${x.rid}">Pago en el partido</button>`}</div>`:''}</div>`).join('')}</section>`;
 }
 
 /* ---------- torneo (nombre, lugar y tipos de partida configurables por la dueña) ---------- */
@@ -1399,7 +1424,7 @@ function vCumples(){
       body=`<div class="fields" style="margin-top:8px"><label><span class="label">Gasto del regalo</span><input type="text" inputmode="numeric" class="money" id="rg-m-${rid}" data-chg="regMonto" data-rid="${rid}" value="${moneyIn(r.monto)}" placeholder="$ 0"></label></div>
         <div class="row"><button class="btn" data-act="regSplit" data-rid="${rid}" ${r.monto&&inn.length?'':'disabled'}>Dividir en partes iguales</button><span class="small muted">Asignado ${money(asig)} de ${money(r.monto||0)}</span></div>
         <div class="reglist">${act.filter(([id])=>id!==x.id).map(([id,p])=>{const v=parts[id]||{};return `<div class="regrow ${v.in?'':'out'}">
-          <label class="chk"><input type="checkbox" data-chg="regIn" data-rid="${rid}" data-pid="${id}" ${v.in?'checked':''}>${avatar(id,22)}<span>${esc(p.name)} <i class="resp ${v.resp?(v.in?'si':'no'):''}">${v.resp?(v.in?'dijo sí':'dijo no'):'sin responder'}</i></span></label>
+          <label class="chk"><input type="checkbox" data-chg="regIn" data-rid="${rid}" data-pid="${id}" ${v.in?'checked':''}>${avatar(id,22)}<span>${esc(p.name)} <i class="resp ${v.resp?(v.in?'si':'no'):''}">${v.resp?(v.in?'dijo sí':'dijo no'):'sin responder'}</i>${v.in&&v.pay&&!v.paid?` <i class="resp pay">${v.pay==='mp'?'pagó por MP':'paga en el partido'}</i>`:''}</span></label>
           ${v.in?`<input type="text" inputmode="numeric" class="money" id="rg-a-${rid}-${id}" data-chg="regAmt" data-rid="${rid}" data-pid="${id}" value="${moneyIn(v.amt)}" placeholder="$ 0">
           <button class="btn ${v.paid?'paid':''}" data-act="regPaid" data-rid="${rid}" data-pid="${id}" aria-pressed="${!!v.paid}">${v.paid?'Pagó ✓':'Debe'}</button>`:'<span></span><span></span>'}
         </div>`}).join('')}</div>`;
@@ -1408,6 +1433,8 @@ function vCumples(){
   };
   return `<section class="card" data-suit="♥"><h2>Cumpleaños</h2>
     <p class="small muted" style="margin:0">Ordenados por el más próximo. Tocá uno para cargar el regalo: cuánto sale, quiénes ponen, cuánto cada uno y quién ya pagó.</p>
+    <div class="fields"><label><span class="label">Alias de Mercado Pago para los regalos</span><input type="text" id="rg-alias" data-chg="regAlias" value="${esc(mpAlias())}" placeholder="ej. coco.regalos.mp" autocapitalize="none" autocomplete="off" spellcheck="false"></label></div>
+    <p class="small muted" style="margin:0">Cuando le asignás el monto a alguien, le aparece un aviso con lo que le toca, este alias y dos opciones: "Ya pagué por MP" o "Pago en el partido".</p>
     ${con.length?`<div class="cumples">${con.map(card).join('')}</div>`:'<p class="empty">Todavía nadie tiene el cumpleaños cargado.</p>'}
     ${sin.length?`<p class="small muted" style="margin:0"><b>Sin fecha:</b> ${sin.map(([,p])=>esc(p.name)).join(', ')}. Se carga en Jugadores → Editar.</p>`:''}
   </section>`;
@@ -1714,7 +1741,10 @@ const ACT={
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
   regPaid:d=>{const v=partsOf(d.rid)[d.pid]||{};rpSave(d.rid,d.pid,{paid:!v.paid})},
   regSplit:d=>{const r=S.regalos[d.rid]||{},ps=partsOf(d.rid),inn=Object.keys(ps).filter(k=>ps[k].in);if(!r.monto||!inn.length)return;
-    const each=Math.ceil(r.monto/inn.length/1000)*1000;inn.forEach(k=>rpSave(d.rid,k,{amt:each}))},
+    const each=Math.ceil(r.monto/inn.length/1000)*1000;inn.forEach(k=>rpSave(d.rid,k,{amt:each,alias:mpAlias()}))},
+  giftPay:d=>{rpSave(d.rid,me(),{pay:d.v,payAt:Date.now()})},
+  giftPayLater:d=>{try{localStorage.setItem('poker.snooze.pay.'+d.rid,today())}catch{}ui.snooze={...(ui.snooze||{}),['pay.'+d.rid]:1};render()},
+  copyAlias:d=>{const ok=()=>{ui.copied=d.v;render();setTimeout(()=>{ui.copied=null;render()},2000)};try{navigator.clipboard.writeText(d.v).then(ok,()=>prompt('Copiá el alias:',d.v))}catch{prompt('Copiá el alias:',d.v)}},
   giftYes:d=>{rpSave(d.rid,me(),{in:true,resp:true,at:Date.now()})},
   giftNo:d=>{rpSave(d.rid,me(),{in:false,resp:true,at:Date.now()})},
   giftLater:d=>{try{localStorage.setItem('poker.snooze.'+d.rid,today())}catch{}ui.snooze={...(ui.snooze||{}),[d.rid]:1};render()},
@@ -1760,7 +1790,9 @@ const CHG={
   time:el=>{const [gid,g]=currentGame();if(canFinish(g))return;Store.update('games',gid,{time:el.value})},
   tourPl:el=>{FB.setInTour(el.dataset.pid,el.dataset.tid,el.checked).catch(fail)},
   regMonto:el=>{const v=digits(el.value);regSave(el.dataset.rid,{monto:v===''?'':+v})},
-  regAmt:el=>{const v=digits(el.value);rpSave(el.dataset.rid,el.dataset.pid,{amt:v===''?'':+v})},
+  regAmt:el=>{const v=digits(el.value);rpSave(el.dataset.rid,el.dataset.pid,{amt:v===''?'':+v,alias:mpAlias()})},
+  regAlias:el=>{const a=el.value.trim();Store.upsert('regalos','_mp',{alias:a});
+    Object.values(S.regpart).filter(x=>x.in&&x.amt&&!x.paid&&x.alias!==a).forEach(x=>rpSave(x.rid,x.pid,{alias:a}))},
   regIn:el=>{rpSave(el.dataset.rid,el.dataset.pid,{in:el.checked})},
   gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid,g]=currentGame();if(canFinish(g))return;if(el.value)Store.update('games',gid,{date:el.value})},

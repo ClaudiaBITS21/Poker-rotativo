@@ -124,16 +124,17 @@ service cloud.firestore {
       allow read, write: if cumpleMgr();
     }
     // Participación de cada jugador en un regalo (id = <regalo>__<jugador>). Cada uno ve y contesta solo
-    // la suya (sí / no); el monto y si pagó los pone quien organiza.
+    // la suya (sí / no, y si paga por Mercado Pago o en el partido); el monto, el alias y si pagó los pone
+    // quien organiza.
     match /regpart/{id} {
       allow read: if cumpleMgr() || (sessionOk() && resource.data.pid == myPid());
       allow create: if cumpleMgr() || (sessionOk()
         && request.resource.data.pid == myPid()
         && id == request.resource.data.rid + '__' + myPid()
-        && request.resource.data.keys().hasOnly(['rid', 'pid', 'in', 'resp', 'at'])
+        && request.resource.data.keys().hasOnly(['rid', 'pid', 'in', 'resp', 'at', 'pay', 'payAt'])
         && request.resource.data.in is bool);
       allow update: if cumpleMgr() || (sessionOk() && resource.data.pid == myPid()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['in', 'resp', 'at']));
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['in', 'resp', 'at', 'pay', 'payAt']));
       allow delete: if cumpleMgr();
     }
 
