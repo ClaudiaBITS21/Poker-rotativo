@@ -171,7 +171,9 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .aseg button.on-juega{background:var(--green);color:#fff}
 .aseg button.on-come{background:var(--gold);color:var(--ink)}
 .rq{border:1.5px dashed #C9BFAE;background:#fff;border-radius:50%;width:30px;height:30px;padding:0;font-family:var(--num);font-size:14px;font-weight:600;color:var(--muted)}
-.rq[aria-pressed="true"]{background:var(--red);border:1px solid var(--red);color:#fff}
+.rq[aria-pressed="true"]{background:var(--red);border:1px solid var(--red);color:#fff;width:auto;min-width:30px;border-radius:999px;padding:0 6px;font-size:12px}
+.rqtag{font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 6px;margin-left:2px;white-space:nowrap}
+.rqtag.used{background:var(--red);color:#fff}.rqtag.free{border:1px dashed #C9BFAE;color:var(--muted)}
 .rbc{display:inline-flex;align-items:center;gap:3px}
 .rbc button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:#fff;font-weight:700;line-height:1;padding:0}
 .rbc button:disabled{opacity:.3;cursor:not-allowed}
@@ -1040,7 +1042,7 @@ function vGame(gid,g){
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
     let extra='<span></span>';
-    if(plays&&g.type==='mie') extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Pidió la recompra':'Recompra sin usar'}" aria-label="Recompra">R</button>`;
+    if(plays&&g.type==='mie') extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Ya usó su recompra (tocá para deshacer)':'Recompra disponible: tocá cuando la pida'}" aria-label="${pt.rq?'Recompra usada':'Recompra disponible'}">${pt.rq?'R✓':'R'}</button>`;
     if(plays&&g.type==='vie') extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
     const ajena=isFB()&&!isAdmin()&&m&&id!==m;
     const seg=[['no','✕'],['juega','♠'],['come','🍽']].map(([k,l])=>`<button data-act="st" data-pid="${id}" ${ajena?'disabled':''} data-v="${k}" class="${k==='come'?'emo ':''}${st===k?'on-'+k:''}" ${closed?'disabled':''} aria-pressed="${st===k}" aria-label="${ST[k]}">${l}</button>`).join('');
@@ -1080,7 +1082,7 @@ function vGame(gid,g){
 
   <section class="card r" data-suit="♥">
     <div class="row spread"><h2>Asistencia</h2><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span></div>
-    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${g.type==='mie'?'<span><b style="color:var(--red)">R</b> pidió la recompra</span>':'<span><b>− +</b> rebuys</span>'}</div>
+    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${g.type==='mie'?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':'<span><b>− +</b> rebuys</span>'}</div>
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
   </section>
 
@@ -1172,7 +1174,7 @@ function vKO(g,c,ts){
   const standing=Object.keys(c.place).sort((a,b)=>c.place[a]-c.place[b]);
   const chips=c.alive.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>{
     const armed=ui.armed==='ko-'+id;
-    return `<button class="kochip ${armed?'armed':''}" data-act="ko" data-pid="${id}" ${on&&!winner?'':'disabled'}>${avatar(id,26)}<span>${armed?'¿Afuera? tocá de nuevo':esc(pname(id))}</span></button>`;
+    return `<button class="kochip ${armed?'armed':''}" data-act="ko" data-pid="${id}" ${on&&!winner?'':'disabled'}>${avatar(id,26)}<span>${armed?'¿Afuera? tocá de nuevo':esc(pname(id))}</span>${g.type==='mie'&&!armed?(c.parts[id]?.rq?'<span class="rqtag used" title="Ya usó su recompra">R✓ usada</span>':'<span class="rqtag free" title="Todavía tiene la recompra">R</span>'):''}</button>`;
   }).join('');
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Eliminaciones</h2><span class="badge gold">Quedan ${c.alive.length} de ${n}</span></div>
