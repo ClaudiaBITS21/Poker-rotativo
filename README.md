@@ -1,4 +1,4 @@
-# Liga de Poker
+# Torneo Poker Rotativo
 
 App de una sola página (`index.html`) publicada como artefacto con base compartida:
 https://claude.ai/artifact/R3GvawhrQCrd4wXij4CxAd
@@ -44,3 +44,15 @@ guarda en el navegador (localStorage).
 ## Video explicativo
 
 `video/liga-poker-tutorial.mp4` (2:33, vertical para celular, con voz en castellano rioplatense) recorre la app paso a paso con datos de ejemplo. El texto de la narración está en `video/narracion.json`; `video/voz.py` genera la voz (Piper es_AR "daniela" con sherpa-onnx) `video/grabar.mjs` graba la app sincronizada con cada frase y `video/mezclar.py` agrega de marco la canción "Miércoles de Poker" (intro, pausa a mitad del video y cierre; bajita mientras habla la voz).
+
+## Versión pública (GitHub Pages + Firebase)
+
+En https://claudiabits21.github.io/Poker-rotativo/ la app guarda los datos en Firebase (proyecto `poker-rotativo`); en claude.ai sigue usando la base del artefacto.
+
+- Nadie necesita cuenta: todos entran con una sesión anónima y pueden ver la liga y manejar la partida (reloj, rebuys, eliminaciones, mesas, cuentas, resultado) y los jugadores.
+- Cada jugador elige su nombre en "¿Quién sos?" y crea un PIN de 4 números (🔒 en la lista cuando ya lo tiene). Con el PIN solo puede cambiar **su** asistencia; el celular lo recuerda.
+- Administradores: Firu, Coco y Mosca con su PIN, y claudia@rodo.es con Google ("Entrar como administradora" al pie). Pueden cambiar la asistencia de cualquiera, resetear PINs, borrar partidas y jugadores y sumar administradores (mails de Google).
+- El PIN nunca se guarda en claro: Firestore guarda un hash que nadie puede leer y las reglas (`firestore.rules`) validan todo del lado del servidor.
+- `data/liga.json` es la exportación de la base de claude.ai; el botón "Importar datos" (Jugadores → Administración, con la liga vacía) la carga en Firebase.
+
+Configuración en la consola de Firebase: Authentication con Anónimo y Google activados y `claudiabits21.github.io` en dominios autorizados; Firestore en modo producción con las reglas de `firestore.rules`.

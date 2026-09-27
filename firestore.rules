@@ -1,0 +1,93 @@
+rules_version = '2';
+// Reglas de la Liga de Poker (Firestore). Se pegan en Firebase → Firestore Database → Reglas.
+//
+// - Todos entran sin cuenta (sesión anónima), ven la liga y pueden manejar la partida y los jugadores.
+// - La asistencia de cada jugador solo la cambia él mismo con su PIN. El PIN nunca se guarda en
+//   claro: solo un hash que nadie puede leer (pins/{pid}). Al ingresarlo se crea sessions/{uid},
+//   que solo se acepta si el hash coincide.
+// - Los administradores (Firu, Coco y Mosca con su PIN, claudia@rodo.es con Google, y la lista config/admins) además pueden
+//   resetear PINs, cambiar la asistencia de cualquiera y borrar partidas o jugadores.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    // Administradores: Firu (Claudia), Coco y Mosca con su PIN, claudia@rodo.es con Google, y quien esté en config/admins.
+    function isAdmin() {
+      return signedIn() && (
+        (request.auth.token.email != null && request.auth.token.email_verified == true
+          && (request.auth.token.email == 'claudia@rodo.es'
+              || (exists(/databases/$(db)/documents/config/admins)
+                  && request.auth.token.email in get(/databases/$(db)/documents/config/admins).data.get('emails', []))))
+        || (sessionOk() && (myPid() in ['pmuhuxmb6f8rh', 'pmuhv51jbc5kd', 'pmuhv64b614dy']
+              || (exists(/databases/$(db)/documents/config/admins)
+                  && myPid() in get(/databases/$(db)/documents/config/admins).data.get('pids', [])))));
+    }
+    // id del jugador de esta sesión, solo si su PIN sigue siendo válido (si el admin lo resetea, se corta)
+    function sessionOk() {
+      return signedIn()
+        && exists(/databases/$(db)/documents/sessions/$(request.auth.uid))
+        && exists(/databases/$(db)/documents/pins/$(get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid))
+        && get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.h
+           == get(/databases/$(db)/documents/pins/$(get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid)).data.h;
+    }
+    function myPid() { return get(/databases/$(db)/documents/sessions/$(request.auth.uid)).data.pid; }
+
+    match /config/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Cualquiera de la mesa puede agregar y editar jugadores; borrar, solo un administrador.
+    match /players/{pid} {
+      allow read, create, update: if signedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Hash del PIN: nadie lo puede leer. Se crea una sola vez junto con pinflags (en el mismo lote).
+    match /pins/{pid} {
+      allow read: if false;
+      allow create: if signedIn() && exists(/databases/$(db)/documents/players/$(pid))
+        && request.resource.data.keys().hasOnly(['h']) && request.resource.data.h is string
+        && request.resource.data.h.size() == 64
+        && existsAfter(/databases/$(db)/documents/pinflags/$(pid));
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+    // Aviso público de que ese jugador ya tiene PIN (para pedir "creá tu PIN" o "ingresá tu PIN").
+    match /pinflags/{pid} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['at'])
+        && existsAfter(/databases/$(db)/documents/pins/$(pid));
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /sessions/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['pid', 'h'])
+        && exists(/databases/$(db)/documents/pins/$(request.resource.data.pid))
+        && get(/databases/$(db)/documents/pins/$(request.resource.data.pid)).data.h == request.resource.data.h;
+    }
+
+    // La partida la maneja cualquiera de la mesa (reloj, rebuys, eliminaciones, mesas, cuentas, resultado).
+    // La asistencia (parts.<id>.st) de cada jugador solo la cambia él mismo con su PIN, o un administrador.
+    match /games/{gid} {
+      allow read: if signedIn();
+      // una partida nueva arranca sin anotados (nadie puede anotar a otros al crearla)
+      allow create: if isAdmin() || (signedIn() && request.resource.data.get('parts', {}).size() == 0);
+      allow delete: if isAdmin();
+      allow update: if isAdmin() || (signedIn() && partsOk());
+    }
+    // Cada cambio toca a lo sumo un jugador dentro de parts; si cambia su asistencia, tiene que ser él.
+    function partsOk() {
+      let before = resource.data.get('parts', {});
+      let after = request.resource.data.get('parts', {});
+      let ch = after.diff(before).affectedKeys();
+      return ch.size() == 0 || (ch.size() == 1 && stOk(ch.toList()[0], before, after));
+    }
+    function stOk(k, before, after) {
+      return after.get(k, {}).get('st', '') == before.get(k, {}).get('st', '')
+        || (sessionOk() && k == myPid() && after.get(k, {}).get('st', '') in ['', 'no', 'juega', 'come']);
+    }
+  }
+}

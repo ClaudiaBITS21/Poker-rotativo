@@ -1,0 +1,439 @@
+{
+"players": {
+"pcasco01": {
+"active": true,
+"createdAt": 1790404700000,
+"hand": "K9",
+"name": "Casco",
+"phrase": "K9 es ALL IN",
+"prev": {
+"pts": 44,
+"won": 7
+},
+"since": "2026-09-26"
+},
+"pcristian01": {
+"active": true,
+"createdAt": 1790404700005,
+"name": "Cristian",
+"prev": {
+"pts": 1,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"pdamian01": {
+"active": true,
+"createdAt": 1790404700001,
+"name": "Damian",
+"prev": {
+"pts": 12,
+"won": 2
+},
+"since": "2026-09-26"
+},
+"pmanteiga01": {
+"active": true,
+"createdAt": 1790437000000,
+"name": "Manteiga",
+"prev": {
+"pts": 7,
+"won": 1
+},
+"since": "2026-09-26"
+},
+"pmatias01": {
+"active": true,
+"createdAt": 1790404700002,
+"name": "Matias",
+"prev": {
+"pts": 2,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"pmuhuxmb6f8rh": {
+"active": true,
+"av": {
+"c": 8,
+"e": "🤑",
+"k": "emo"
+},
+"createdAt": 1790394962226,
+"name": "Firu",
+"prev": {
+"pts": 7,
+"won": 1
+},
+"since": "2026-09-26"
+},
+"pmuhv4vr2vqxv": {
+"active": true,
+"createdAt": 1790395301054,
+"name": "Gallego",
+"prev": {
+"pts": 26,
+"won": 2
+},
+"since": "2026-09-26"
+},
+"pmuhv51jbc5kd": {
+"active": true,
+"createdAt": 1790395308551,
+"hand": "44",
+"name": "Coco",
+"phrase": "El profesor",
+"prev": {
+"pts": 38,
+"won": 5
+},
+"since": "2026-09-26"
+},
+"pmuhv54s9oki1": {
+"active": true,
+"createdAt": 1790395312761,
+"name": "Pablo",
+"prev": {
+"pts": 34,
+"won": 6
+},
+"since": "2026-09-26"
+},
+"pmuhv5ma0gow0": {
+"active": true,
+"createdAt": 1790395335432,
+"name": "Pelado",
+"prev": {
+"pts": 39,
+"won": 6
+},
+"since": "2026-09-26"
+},
+"pmuhv5qjzhx9d": {
+"active": true,
+"createdAt": 1790395340975,
+"name": "Fantastica71",
+"since": "2026-09-26"
+},
+"pmuhv5wivp6tp": {
+"active": true,
+"createdAt": 1790395348711,
+"days": "",
+"hand": "",
+"name": "Jaime",
+"phrase": "Hice bien Coquito?",
+"prev": {
+"pts": 18,
+"won": 3
+},
+"since": "2026-09-26"
+},
+"pmuhv60i9ei7e": {
+"active": true,
+"createdAt": 1790395353874,
+"name": "Guido",
+"prev": {
+"pts": 2,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"pmuhv64b614dy": {
+"active": true,
+"createdAt": 1790395358802,
+"name": "Mosca",
+"prev": {
+"pts": 32,
+"won": 3
+},
+"since": "2026-09-26"
+},
+"pmuhv6kemsi85": {
+"active": true,
+"createdAt": 1790395379662,
+"name": "Ricky",
+"prev": {
+"pts": 43,
+"won": 7
+},
+"since": "2026-09-26"
+},
+"pmuhv796809l3": {
+"active": true,
+"createdAt": 1790395411760,
+"name": "Alex",
+"prev": {
+"pts": 27,
+"won": 3
+},
+"since": "2026-09-26"
+},
+"pmuhvauker7ib": {
+"active": true,
+"createdAt": 1790395579454,
+"name": "Sombrero",
+"since": "2026-09-26"
+},
+"pmuhvay0f5mxx": {
+"active": true,
+"createdAt": 1790395583919,
+"name": "Rulo",
+"prev": {
+"pts": 3,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"pmuhvb2d1diqo": {
+"active": true,
+"av": {
+"c": 7,
+"e": "🔥",
+"k": "emo"
+},
+"createdAt": 1790395589557,
+"name": "Aldo",
+"prev": {
+"pts": 12,
+"won": 2
+},
+"since": "2026-09-26"
+},
+"pmuhvbg9skuwc": {
+"active": true,
+"createdAt": 1790395607584,
+"name": "El Negro Julian",
+"since": "2026-09-26"
+},
+"pmuhvbl6hsddk": {
+"active": true,
+"createdAt": 1790395613945,
+"name": "Juli",
+"since": "2026-09-26"
+},
+"pmuhvboga9dj2": {
+"active": true,
+"createdAt": 1790395618186,
+"name": "Jorge",
+"prev": {
+"pts": 16,
+"won": 2
+},
+"since": "2026-09-26"
+},
+"pmuhvbvg9l0jf": {
+"active": true,
+"createdAt": 1790395627257,
+"name": "Willy",
+"prev": {
+"pts": 21,
+"won": 3
+},
+"since": "2026-09-26"
+},
+"pmuhvd1a3u3i5": {
+"active": true,
+"createdAt": 1790395681467,
+"name": "Gusti",
+"phrase": "Nadie baja ganando",
+"prev": {
+"pts": 4,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"pmuhvo93jdsmm": {
+"active": true,
+"createdAt": 1790396204815,
+"name": "Pato",
+"prev": {
+"pts": 19,
+"won": 2
+},
+"since": "2026-09-26"
+},
+"pseba01": {
+"active": true,
+"createdAt": 1790404700003,
+"name": "Seba",
+"prev": {
+"pts": 2,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"ptato01": {
+"active": true,
+"createdAt": 1790404700006,
+"name": "Tato",
+"prev": {
+"pts": 0,
+"won": 0
+},
+"since": "2026-09-26"
+},
+"ptommy01": {
+"active": true,
+"createdAt": 1790404700004,
+"name": "Tommy",
+"prev": {
+"pts": 2,
+"won": 0
+},
+"since": "2026-09-26"
+}
+},
+"games": {
+"gmuhuzh31lw2k": {
+"closedAt": 1790434000000,
+"createdAt": 1790395048765,
+"date": "2026-09-25",
+"entry": 15000,
+"food": "",
+"foodMode": "pp",
+"foodPP": 25000,
+"levelMin": 12,
+"parts": {
+"pmuhuxmb6f8rh": {
+"rb": 4,
+"st": "come"
+},
+"pmuhv4vr2vqxv": {
+"rb": 4,
+"st": "come"
+},
+"pmuhv51jbc5kd": {
+"rb": 4,
+"st": "come"
+},
+"pmuhv54s9oki1": {
+"rb": 2,
+"st": "come"
+},
+"pmuhv5ma0gow0": {
+"rb": 3,
+"st": "come"
+},
+"pmuhv5qjzhx9d": {
+"rb": 2,
+"st": "come"
+},
+"pmuhv5wivp6tp": {
+"rb": 1,
+"st": "come"
+},
+"pmuhv60i9ei7e": {
+"rb": 4,
+"st": "come"
+},
+"pmuhv64b614dy": {
+"st": "come"
+},
+"pmuhv6kemsi85": {
+"rb": 3,
+"st": "come"
+},
+"pmuhv796809l3": {
+"rb": 1,
+"st": "come"
+},
+"pmuhvauker7ib": {
+"rb": 3,
+"st": "come"
+},
+"pmuhvay0f5mxx": {
+"st": "come"
+},
+"pmuhvb2d1diqo": {
+"rb": 4,
+"st": "come"
+},
+"pmuhvbg9skuwc": {
+"st": "come"
+},
+"pmuhvbl6hsddk": {
+"st": "come"
+},
+"pmuhvboga9dj2": {
+"rb": 2,
+"st": "come"
+},
+"pmuhvbvg9l0jf": {
+"rb": 1,
+"st": "come"
+},
+"pmuhvd1a3u3i5": {
+"rb": 2,
+"st": "come"
+},
+"pmuhvo93jdsmm": {
+"rb": 3,
+"st": "come"
+}
+},
+"rebuyPrice": 10000,
+"result": {
+"p1": "pmuhvay0f5mxx",
+"p2": "pmuhv64b614dy",
+"p3": "pmuhv5wivp6tp"
+},
+"resultManual": true,
+"status": "closed",
+"time": "01:20",
+"timer": {
+"acc": 0,
+"anchor": 1790431895502,
+"brk": false,
+"level": 13,
+"running": false
+},
+"type": "vie"
+},
+"gmuih0iee7h2l": {
+"breakMin": 20,
+"createdAt": 1790432048678,
+"date": "2026-09-30",
+"entry": "",
+"food": "",
+"foodMode": "total",
+"foodPP": "",
+"levelMin": 7,
+"parts": {},
+"rebuyPrice": "",
+"result": {},
+"status": "open",
+"time": "",
+"timer": {
+"acc": 0,
+"anchor": 0,
+"brk": false,
+"level": 0,
+"running": false
+},
+"type": "mie"
+},
+"gmuinofb1p135": {
+"breakMin": 20,
+"createdAt": 1790443242109,
+"date": "2026-09-30",
+"entry": "",
+"food": "",
+"foodMode": "total",
+"foodPP": "",
+"levelMin": 7,
+"parts": {},
+"rebuyPrice": "",
+"result": {},
+"status": "open",
+"time": "",
+"timer": {
+"acc": 0,
+"anchor": 0,
+"brk": false,
+"level": 0,
+"running": false
+},
+"type": "mie"
+}
+}
+}
