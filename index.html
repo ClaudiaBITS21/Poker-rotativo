@@ -125,9 +125,9 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (max-width:560px){.typepick{grid-template-columns:1fr}}
 .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .fields label{display:flex;flex-direction:column;gap:4px;min-width:0}
-.fmode{display:inline-flex;margin-left:4px;border:1px solid var(--line);border-radius:999px;overflow:hidden;vertical-align:middle;text-transform:none;letter-spacing:0}
+.fmode{display:inline-flex;align-self:flex-start;margin-top:6px;border:1px solid var(--line);border-radius:999px;overflow:hidden;vertical-align:middle;text-transform:none;letter-spacing:0}
 .fmode button{border:0;background:#fff;padding:1px 8px;font-size:11px;font-weight:700;color:var(--muted)}
-.fmode button[aria-pressed="true"]{background:var(--ink);color:var(--gold)}
+.fmode button[aria-pressed="true"]{background:var(--felt-2);color:#FBEBD2}
 .fields input,.fields select{width:100%}
 
 /* ---- resumen con fichas ---- */
@@ -904,6 +904,8 @@ function splitPot(pot,split){
   });
   return out;
 }
+// Comida: por defecto por persona; las partidas viejas que tienen un total cargado siguen como total
+const foodModeOf=g=>g.foodMode||(+g.food?'total':'pp');
 function calc(g){
   const t=TYPES[g.type],parts={...(g.parts||{})};
   const playing=Object.keys(parts).filter(id=>parts[id].st==='juega'||parts[id].st==='come');
@@ -915,7 +917,7 @@ function calc(g){
   const pot=entry*playing.length+rbp*rebuys;
   const prizes=splitPot(pot,t.split);
   // comida: se carga el total (se divide entre los que comen) o directamente el monto por persona
-  const perPerson=g.foodMode==='pp',foodPP=+g.foodPP||0;
+  const perPerson=foodModeOf(g)==='pp',foodPP=+g.foodPP||0;
   const foodShare=perPerson?foodPP:(eaters.length?food/eaters.length:0);
   const foodTotal=perPerson?foodPP*eaters.length:food;
   const owes=Object.fromEntries(playing.map(id=>{
@@ -1125,9 +1127,9 @@ function vGame(gid,g){
     <div class="fields">
       <label><span class="label">Entrada</span><input type="text" inputmode="numeric" class="money" id="g-entry" data-chg="num" data-k="entry" value="${moneyIn(g.entry)}" ${closed?'disabled':''}></label>
       <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} </span><input type="text" inputmode="numeric" class="money" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${moneyIn(g.rebuyPrice)}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
-      <label><span class="label">Comida <span class="fmode">${[['total','Total'],['pp','Por persona']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${(g.foodMode||'total')===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></span>${c.perPerson
+      <label><span class="label">Comida</span>${c.perPerson
         ?`<input type="text" inputmode="numeric" class="money" id="g-foodpp" data-chg="num" data-k="foodPP" value="${moneyIn(g.foodPP)}" placeholder="Por persona" ${closed?'disabled':''}>`
-        :`<input type="text" inputmode="numeric" class="money" id="g-food" data-chg="num" data-k="food" value="${moneyIn(g.food)}" placeholder="Total de la comida" ${closed?'disabled':''}>`}</label>
+        :`<input type="text" inputmode="numeric" class="money" id="g-food" data-chg="num" data-k="food" value="${moneyIn(g.food)}" placeholder="Total de la comida" ${closed?'disabled':''}>`}<span class="fmode">${[['pp','Por persona'],['total','Total']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${foodModeOf(g)===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
       <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
@@ -1747,7 +1749,7 @@ const ACT={
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
       const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
-        entry:prev.entry??'',food:'',foodMode:prev.foodMode||'total',foodPP:prev.foodMode==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
+        entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
