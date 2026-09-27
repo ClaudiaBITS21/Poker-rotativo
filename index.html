@@ -348,6 +348,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .alias{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px dashed var(--gold-2);border-radius:10px;background:#FFF8EC}.alias .small{flex-basis:100%}.alias b{font-size:17px;word-break:break-all;flex:1}.regmine:first-of-type{border-top:0}
 .mpline{margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:400}.btn.mini{min-height:26px;padding:2px 10px;font-size:12px;border-radius:8px}
 .giftlist{display:flex;flex-direction:column}.giftrow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}.giftrow:first-child{border-top:0}.giftrow .gw{display:flex;align-items:center;gap:10px;min-width:0}.giftrow.bd{flex-wrap:nowrap}.giftrow.bd .gw{flex:1}.giftrow.bd .row{flex-wrap:nowrap}
+.ufseg{display:flex;flex-wrap:wrap;gap:6px}.ufseg button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;min-height:32px}.ufseg button[aria-pressed="true"]{background:var(--felt-2);border-color:var(--felt-2);color:#FBEBD2}.ufseg button[aria-pressed="true"] .muted{color:#E8C9B8}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -1628,9 +1629,11 @@ function vPanel(){
       </div>`:''}
     </div>`;
   };
-  const users=allP.map(([pid,p])=>{const ss=ses.filter(x=>x.pid===pid),last=Math.max(0,...ss.map(x=>x.at||0));
+  const uf=ui.userTour&&tours[ui.userTour]?ui.userTour:'',uP=uf?allP.filter(([,p])=>p.ts&&p.ts[uf]):allP;
+  const ufTabs=`<div class="ufseg">${[['','Todos',allP.length],...Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(([tid,t])=>[tid,t.name||tid,allP.filter(([,p])=>p.ts&&p.ts[tid]).length])].map(([k,l,n])=>`<button data-act="userTour" data-v="${k}" aria-pressed="${uf===k}">${esc(l)} <span class="muted">${n}</span></button>`).join('')}</div>`;
+  const users=uP.map(([pid,p])=>{const ss=ses.filter(x=>x.pid===pid),last=Math.max(0,...ss.map(x=>x.at||0));
     return `<tr><td><span class="who">${avatar(pid,22)}${esc(p.name)}</span></td><td>${ui.pinflags&&ui.pinflags.has(pid)?'🔒 '+fdate(ui.pinAt&&ui.pinAt[pid]):'<span class="muted">sin PIN</span>'}</td><td class="r">${ss.length||''}</td><td>${ss.length?fdate(last):''}</td><td class="small">${Object.keys(p.ts||{}).map(t=>esc((tours[t]&&tours[t].name)||t)).join(', ')}</td></tr>`}).join('');
-  const conPin=allP.filter(([pid])=>ui.pinflags&&ui.pinflags.has(pid)).length;
+  const conPin=uP.filter(([pid])=>ui.pinflags&&ui.pinflags.has(pid)).length;
   const nuevoOpen=ui.tourNewOpen||!tours[TID];
   const nuevo=nuevoOpen?`<form data-form="tourNew" class="edit">
       <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="amigos-club" maxlength="40" value="${tours[TID]?'':esc(TID)}"></label>
@@ -1648,7 +1651,8 @@ function vPanel(){
     ${Object.keys(tours).length?`<div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>`:'<p class="empty">Todavía no hay torneos.</p>'}
   </section>
   <section class="card r" data-suit="♥"><h2>Usuarios</h2>
-    <p class="small muted" style="margin:0">${conPin} de ${allP.length} jugadores ya pusieron PIN. "Celulares" = en cuántos entraron con su PIN; "último ingreso" = la última vez que pusieron el PIN.</p>
+    ${ufTabs}
+    <p class="small muted" style="margin:0">${conPin} de ${uP.length} jugadores${uf?' de '+esc(tours[uf].name||uf):''} ya pusieron PIN. "Celulares" = en cuántos entraron con su PIN; "último ingreso" = la última vez que pusieron el PIN.</p>
     <div class="tw"><table><thead><tr><th>Jugador</th><th>PIN</th><th class="r">Celulares</th><th>Último ingreso</th><th>Torneos</th></tr></thead><tbody>${users}</tbody></table></div>
   </section>`;
 }
@@ -2000,6 +2004,7 @@ const ACT={
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
+  userTour:d=>{ui.userTour=d.v;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
   tyAdd:d=>{const k='t'+Date.now().toString(36);ui.tkeys[d.tid]=[...ui.tkeys[d.tid],k];render()},
   tyDel:d=>{
