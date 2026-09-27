@@ -551,10 +551,13 @@ const FB={
     render();
   },
   dataOn:false,dunsub:[],
+  rebuild(){const L=ui.looks||{};S.players=Object.fromEntries(Object.entries(ui.allPlayers||{}).filter(([,p])=>p.ts&&p.ts[TID]).map(([id,p])=>[id,{...p,...(L[id]||{})}]))},
   startData(){
     const m=this.m,onErr=e=>{ui.err=e.code==='permission-denied'?'Firebase no deja leer los datos: revisá que estén pegadas las reglas de seguridad.':'Se perdió la conexión ('+e.code+'). Recargá la página.';ui.loaded=true;render()};
     this.dataOn=true;
-    this.dunsub.push(m.onSnapshot(m.collection(this.db,'players'),snap=>{ui.allPlayers=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));S.players=Object.fromEntries(Object.entries(ui.allPlayers).filter(([,p])=>p.ts&&p.ts[TID]));ui.loaded=true;render()},onErr));
+    this.dunsub.push(m.onSnapshot(m.collection(this.db,'players'),snap=>{ui.allPlayers=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));this.rebuild();ui.loaded=true;render()},onErr));
+    // avatar, mano y frase propios de este torneo (looks/<torneo>_<jugador>) por encima de la ficha compartida
+    this.dunsub.push(m.onSnapshot(m.query(m.collection(this.db,'looks'),m.where('tid','==',TID)),snap=>{ui.looks=Object.fromEntries(snap.docs.map(d=>{const {tid,pid,...l}=d.data();return [pid,l]}));this.rebuild();render()},()=>{ui.looks={}}));
     this.dunsub.push(m.onSnapshot(m.query(m.collection(this.db,'games'),m.where('tid','==',TID)),snap=>{S.games=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));ui.loaded=true;render()},onErr));
     this.dunsub.push(m.onSnapshot(m.collection(this.db,'pinflags'),snap=>{ui.pinflags=new Set(snap.docs.map(d=>d.id));ui.pinAt=Object.fromEntries(snap.docs.map(d=>[d.id,d.data().at]));render()},()=>{}));
     this.dunsub.push(m.onSnapshot(m.doc(this.db,'config','admins'),d=>{ui.admins=d.exists()?(d.data().emails||[]):[];ui.adminPids=d.exists()?(d.data().pids||[]):[];render()},()=>{ui.admins=[];ui.adminPids=[]}));
@@ -1670,6 +1673,16 @@ function setTimer(gid,t){return Store.update('games',gid,{timer:t})}
 
 /* ---------- acciones ---------- */
 // Participación de cada jugador en un regalo: doc <regalo>__<jugador> en regpart (cada uno ve solo la suya)
+// Avatar, mano favorita y frase: en la versión pública son de cada torneo; el resto de la ficha es compartida.
+const LOOK=['av','hand','phrase'];
+function savePlayer(pid,patch){
+  if(!isFB())return Store.update('players',pid,patch);
+  const look={},rest={};for(const [k,v] of Object.entries(patch))(LOOK.includes(k)?look:rest)[k]=v;
+  const ps=[];
+  if(Object.keys(look).length)ps.push(Store.set('looks',TID+'_'+pid,{...Object.fromEntries(LOOK.map(k=>[k,S.players[pid]?.[k]??''])),...look,tid:TID,pid}));
+  if(Object.keys(rest).length)ps.push(Store.update('players',pid,rest));
+  return Promise.all(ps);
+}
 const partsOf=rid=>Object.fromEntries(Object.values(S.regpart).filter(x=>x.rid===rid).map(x=>[x.pid,x]));
 const rpSave=(rid,pid,patch)=>Store.upsert('regpart',rid+'__'+pid,{rid,pid,...patch});
 function regSave(rid,patch){const [pid,y]=rid.split('_');return S.regalos[rid]?Store.update('regalos',rid,patch):Store.set('regalos',rid,merge({pid,year:+y,monto:'',parts:{}},patch))}
@@ -1806,7 +1819,7 @@ const ACT={
   avSet:d=>{ui.avDraft={...ui.avDraft,[d.f]:d.f==='c'?+d.v:d.v};render()},
   avSave:()=>{
     const pid=ui.avFor,p=S.players[pid],a=ui.avDraft;
-    if(p&&a&&(a.k!=='photo'||a.src)){const {av,...rest}=p;Store.set('players',pid,{...rest,av:a})}
+    if(p&&a&&(a.k!=='photo'||a.src)){if(isFB())savePlayer(pid,{av:a});else{const {av,...rest}=p;Store.set('players',pid,{...rest,av:a})}}
     ACT.avClose();
   },
   avClose:()=>{ui.avFor=null;ui.avDraft=null;render()},
@@ -1907,7 +1920,7 @@ document.addEventListener('submit',e=>{
     if(fb&&(!mt||+mt[1]<1||+mt[1]>31||+mt[2]<1||+mt[2]>12)){ui.err='El cumpleaños va como dd/mm/aaaa (el año es opcional), por ejemplo 12/03/1975.';render();return}
     const bday=mt?String(+mt[2]).padStart(2,'0')+'-'+String(+mt[1]).padStart(2,'0'):'',byear=mt&&mt[3]?+mt[3]:'';
     const extra=editaMp(pid)?{mp:v('rm-')}:{};
-    ui.editing=null;if(name)Store.update('players',pid,{name,hand,phrase,days,bday,byear,...extra});else render();
+    ui.editing=null;if(name)savePlayer(pid,{name,hand,phrase,days,bday,byear,...extra});else render();
   }
 });
 render();

@@ -96,6 +96,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Avatar, mano favorita y frase de un jugador en un torneo (id = <torneo>_<jugador>): los edita cualquiera
+    // que entró a ese torneo, igual que la ficha, sin tocar lo de los otros torneos.
+    match /looks/{id} {
+      allow read: if isMember(resource.data.tid);
+      allow create: if isMember(request.resource.data.tid)
+        && id == request.resource.data.tid + '_' + request.resource.data.pid
+        && request.resource.data.keys().hasOnly(['tid', 'pid', 'av', 'hand', 'phrase']);
+      allow update: if isMember(resource.data.tid)
+        && request.resource.data.tid == resource.data.tid && request.resource.data.pid == resource.data.pid
+        && request.resource.data.keys().hasOnly(['tid', 'pid', 'av', 'hand', 'phrase']);
+      allow delete: if isAdmin();
+    }
+
     // Hash del PIN: nadie lo puede leer. Se crea una sola vez junto con pinflags (en el mismo lote).
     match /pins/{pid} {
       allow read: if false;

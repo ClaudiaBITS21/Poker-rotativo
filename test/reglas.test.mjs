@@ -113,4 +113,9 @@ await t('B no ve el total del regalo',getDoc(doc(P,'regalos','r1')),false);
 await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'games','gvieja'),{type:'mie',date:'2026-09-01',parts:{}})});
 await t('Pato no ve la partida sin torneo',getDoc(doc(P,'games','gvieja')),false);
 await t('dueña la arregla',setDoc(doc(G,'games','gvieja'),{type:'mie',date:'2026-09-01',parts:{},tid:'rot'}),true);
+// avatar/mano/frase por torneo
+await t('X pone la frase de A en su torneo',setDoc(doc(X,'looks','rot_pA'),{tid:'rot',pid:'pA',phrase:'hola',hand:'',av:''}),true);
+await t('X no la pone en otro torneo',setDoc(doc(X,'looks','otro_pA'),{tid:'otro',pid:'pA',phrase:'hola'}),false);
+await t('id mal armado',setDoc(doc(X,'looks','rot_pB'),{tid:'rot',pid:'pA',phrase:'x'}),false);
+await t('sin clave no ve los looks',getDoc(doc(anon('uZ'),'looks','rot_pA')),false);
 console.log(`\n${ok} ok, ${bad} fallaron`);await env.cleanup();process.exit(bad?1:0);
