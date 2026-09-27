@@ -1,3 +1,6 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0C0C0C">
 <title>Torneo Poker Rotativo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -467,6 +470,8 @@ const FB={
     const [a,au,fs]=await Promise.all(['firebase-app.js','firebase-auth.js','firebase-firestore.js'].map(f=>import(FBV+f)));
     this.m={...a,...au,...fs};const m=this.m;
     const app=m.initializeApp(FIREBASE);this.auth=m.getAuth(app);this.db=m.getFirestore(app);
+    // solo para pruebas locales: ?emu usa los emuladores de Firebase en esta compu
+    if(new URLSearchParams(location.search).has('emu')&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){m.connectAuthEmulator(this.auth,'http://127.0.0.1:9099',{disableWarnings:true});m.connectFirestoreEmulator(this.db,'127.0.0.1',8085)}
     try{await m.getRedirectResult(this.auth)}catch(e){ui.err='No se pudo entrar con Google ('+(e.code||e.message)+').'}
     m.onAuthStateChanged(this.auth,u=>{
       if(!u){m.signInAnonymously(this.auth).catch(e=>{ui.err=e.code==='auth/operation-not-allowed'?'Falta activar el acceso anónimo en Firebase (Authentication → Método de acceso → Anónimo).':'No se pudo conectar ('+e.code+').';ui.loaded=true;render()});return}
@@ -1045,6 +1050,8 @@ document.addEventListener('keydown',e=>{
 /* ---------- selector de avatar ---------- */
 function renderPin(w){
   const pid=ui.pinFor,has=ui.pinflags&&ui.pinflags.has(pid);
+  // hasta saber si ya tiene PIN, no mostrar "creá tu PIN"
+  if(!ui.pinflags){w.innerHTML=`<div class="modal" data-act="pinBackdrop"><section class="card"><p class="empty">Cargando…</p></section></div>`;return}
   const inp=(id,ph)=>`<input class="pinin" id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="${ph}">`;
   w.innerHTML=`<div class="modal" data-act="pinBackdrop"><section class="card" data-suit="♠" role="dialog" aria-modal="true" aria-label="PIN">
     <div class="who">${avatar(pid,48)}<h2>${esc(pname(pid))}</h2></div>
@@ -1435,7 +1442,7 @@ const CHG={
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(!b){return}
-  if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)&&!(b.dataset.act==='ko'&&ui.armed==='ko-'+b.dataset.pid)){ui.armed=null}
+  if(ui.armed&&b.dataset.act!==ui.armed&&!(b.dataset.act==='delPlayer'&&ui.armed==='delP-'+b.dataset.pid)&&!(b.dataset.act==='ko'&&ui.armed==='ko-'+b.dataset.pid)&&!(b.dataset.act==='pinReset'&&ui.armed==='pinR-'+b.dataset.pid)){ui.armed=null}
   ACT[b.dataset.act]?.(b.dataset,b,e);
 });
 // formatea la plata mientras se escribe, con el cursor siempre al final
