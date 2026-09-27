@@ -114,7 +114,7 @@ button.avbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .gamepick .dot.vie{background:#FFB39F}
 .card .gamepick button{background:#fff;color:var(--ink);border-color:var(--line)}
 .card .gamepick button[aria-current="true"]{background:var(--ink);color:var(--gold);border-color:var(--ink)}
-.typepick{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.typepick{display:grid;grid-template-columns:1fr 1fr;gap:12px}.typepick.one{grid-template-columns:1fr}
 .opt{position:relative;border:1px solid var(--line);border-radius:12px;padding:14px 14px 14px 16px;display:flex;flex-direction:column;gap:6px;background:#fff;text-align:left;overflow:hidden}
 .opt::after{content:attr(data-pip);position:absolute;right:12px;bottom:4px;font-size:54px;line-height:1;opacity:.08}
 .opt.mie{border-left:5px solid var(--green)} .opt.vie{border-left:5px solid var(--red)}
@@ -331,6 +331,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .ttype{border:1px solid var(--line);border-radius:12px;padding:8px 12px 12px}.ttype legend{font-weight:700;font-size:13px;padding:0 4px}
 .tplayers{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 10px}
 .tplayers .chk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edit label.chk{flex-direction:row;align-items:center;gap:8px}.edit .chk input{width:auto}
+.ttype .cutf{display:none}.ttype:has(.rbsel option[value="libre"]:checked) .cutf{display:flex}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -503,11 +505,23 @@ h3{font-weight:600}
 /* ---------- reglas ---------- */
 const BLINDS=[1,2,3,4,5,6,8,10,12,15,20,25,30,40,50,60,80,100,120,150,200,250,300,400,500,600,800,1000];
 const REBUY_CUT=BLINDS.indexOf(10); // en "con rebuy" el rebuy cierra al terminar 10-20
+// Tipos de partida del torneo. Los del Rotativo son estos dos; cada torneo nuevo define los suyos.
+// rb: 'una' = una recompra incluida · 'libre' = rebuys hasta terminar el nivel cut · 'no' = sin recompra
 const TYPES={
-  mie:{name:'Rápido',dow:3,min:7,pts:[5,2],split:[70,30]},
-  vie:{name:'Con rebuy',dow:5,min:12,pts:[7,3,1],split:[60,30,10]}
+  mie:{name:'Rápido',dow:3,min:7,pts:[5,2],split:[70,30],rb:'una'},
+  vie:{name:'Con rebuy',dow:5,min:12,pts:[7,3,1],split:[60,30,10],rb:'libre'}
 };
 const TYPES0=JSON.parse(JSON.stringify(TYPES));
+const T=k=>TYPES[k]||TYPES0[k]||Object.values(TYPES)[0];
+const tyOf=g=>T(g.type);
+const rbm=g=>tyOf(g).rb||(g.type==='vie'?'libre':'una');
+const isLibre=g=>rbm(g)==='libre',isUna=g=>rbm(g)==='una';
+const blindsOf=g=>(g&&tyOf(g).blinds&&tyOf(g).blinds.length)?tyOf(g).blinds:BLINDS;
+// nivel en el que se cierra el rebuy (y después del cual va el break): por defecto el 10-20
+const cutOf=g=>{const t=g?tyOf(g):{};if(t.cut!=null)return +t.cut;const i=blindsOf(g).indexOf(10);return i>=0?i:REBUY_CUT};
+const tcls=k=>T(k).rb==='libre'?'vie':'mie';
+const typeKeys=()=>Object.keys(TYPES);
+const dosDias=()=>!!(TYPES.mie&&TYPES.vie); // el Rotativo: miércoles y viernes, con jugadores "solo viernes"
 const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const ST={no:'No va',juega:'Juega',come:'Juega + come'};
 const CHIPC=['#C1272D','#1F4FA8','#17744B','#1B1713','#6B3FA0','#E07A1F','#D64B8A','#0F8A8A','#8A5A2B','#B8901F'];
@@ -610,7 +624,8 @@ const FB={
   },
   async saveTour(tid,data,key){
     const m=this.m,b=m.writeBatch(this.db);
-    b.set(m.doc(this.db,'tournaments',tid),clean(data),{merge:true});
+    // los tipos de partida se reemplazan enteros (para que se puedan quitar)
+    b.set(m.doc(this.db,'tournaments',tid),clean(data),data.types?{mergeFields:Object.keys(data)}:{merge:true});
     if(typeof key==='string')b.set(m.doc(this.db,'tkeys',tid),{h:await sha(tid+':'+key)});
     await b.commit();
   },
@@ -738,7 +753,7 @@ const moneyIn=v=>{const d=digits(v);return d===''?'':money(+d)};
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>ymd(new Date());
 const fmtDate=s=>{if(!s)return '';const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'})};
-const blind=i=>{const s=BLINDS[Math.min(i,BLINDS.length-1)];return s+'-'+s*2};
+const blind=(i,g)=>{const B=blindsOf(g),s=B[Math.min(i,B.length-1)];return s+'-'+s*2};
 const pname=id=>S.players[id]?.name||'(borrado)';
 const gTitle=g=>g.title?esc(g.title):'';
 const safeUrl=u=>/^https:\/\/[^\s"'<>]+$/.test(u||'')?u:'';
@@ -892,7 +907,10 @@ const tourName=()=>(isFB()&&ui.tour&&ui.tour.name)||'Poker Rotativo';
 const tourSub=()=>(isFB()&&ui.tour&&ui.tour.subtitle)||'Miércoles rápido · Viernes SUM';
 function applyTour(){
   const t=ui.tour||{};
-  for(const k of ['mie','vie'])Object.assign(TYPES[k],JSON.parse(JSON.stringify(TYPES0[k])),t.types&&t.types[k]||{});
+  const src=t.types&&Object.keys(t.types).length?t.types:TYPES0;
+  for(const k of Object.keys(TYPES))delete TYPES[k];
+  for(const [k,v] of Object.entries(src))TYPES[k]={...(TYPES0[k]||{}),...JSON.parse(JSON.stringify(v)),rb:v.rb||(TYPES0[k]&&TYPES0[k].rb)||'una'};
+  if(!TYPES[ui.newType])ui.newType=typeKeys()[0];
   if(t.place!=null)LUGAR.place=t.place;if(t.map!=null)LUGAR.map=t.map;
   document.title='Torneo '+tourName();
 }
@@ -934,12 +952,12 @@ function splitPot(pot,split){
 // Comida: por defecto por persona; las partidas viejas que tienen un total cargado siguen como total
 const foodModeOf=g=>g.foodMode||(+g.food?'total':'pp');
 function calc(g){
-  const t=TYPES[g.type],parts={...(g.parts||{})};
+  const t=T(g.type),parts={...(g.parts||{})};
   const playing=Object.keys(parts).filter(id=>parts[id].st==='juega'||parts[id].st==='come');
   // los ganadores cuentan como que jugaron aunque nadie haya cargado su asistencia
   for(const k of ['p1','p2','p3','ceb']){const id=(g.result||{})[k];if(id&&!playing.includes(id)){playing.push(id);parts[id]=parts[id]||{st:'juega'}}}
   const eaters=playing.filter(id=>parts[id].st==='come');
-  const rebuys=g.type==='vie'?playing.reduce((s,id)=>s+(parts[id].rb||0),0):playing.filter(id=>parts[id].rq).length;
+  const rebuys=isLibre(g)?playing.reduce((s,id)=>s+(parts[id].rb||0),0):playing.filter(id=>parts[id].rq).length;
   const entry=+g.entry||0,rbp=+g.rebuyPrice||0,food=+g.food||0;
   const pot=entry*playing.length+rbp*rebuys;
   const prizes=splitPot(pot,t.split);
@@ -948,7 +966,7 @@ function calc(g){
   const foodShare=perPerson?foodPP:(eaters.length?food/eaters.length:0);
   const foodTotal=perPerson?foodPP*eaters.length:food;
   const owes=Object.fromEntries(playing.map(id=>{
-    const n=g.type==='vie'?(parts[id].rb||0):(parts[id].rq?1:0),rb=n*rbp;
+    const n=isLibre(g)?(parts[id].rb||0):(parts[id].rq?1:0),rb=n*rbp;
     const f=parts[id].st==='come'?foodShare:0;
     return [id,{entry,n,rb,food:f,total:entry+rb+f}];
   }));
@@ -962,11 +980,11 @@ function calc(g){
 // Etapas: niveles de ciegas y un break después del 10-20. Nada avanza solo:
 // al llegar a 0:00 la etapa queda terminada hasta que alguien arranca la siguiente.
 const brkMin=g=>g.breakMin===''||g.breakMin==null?20:Math.max(0,+g.breakMin||0);
-function nextStage(g,t){ if(!t.brk&&(t.level||0)===REBUY_CUT&&brkMin(g)>0) return {level:REBUY_CUT,brk:true}; return {level:(t.level||0)+1,brk:false}; }
-function prevStage(g,t){ if(t.brk) return {level:t.level,brk:false}; if(t.level===REBUY_CUT+1&&brkMin(g)>0) return {level:REBUY_CUT,brk:true}; return {level:Math.max(0,(t.level||0)-1),brk:false}; }
+function nextStage(g,t){ const c=cutOf(g); if(!t.brk&&(t.level||0)===c&&brkMin(g)>0) return {level:c,brk:true}; return {level:(t.level||0)+1,brk:false}; }
+function prevStage(g,t){ const c=cutOf(g); if(t.brk) return {level:t.level,brk:false}; if(t.level===c+1&&brkMin(g)>0) return {level:c,brk:true}; return {level:Math.max(0,(t.level||0)-1),brk:false}; }
 function tstate(g){
   const t={running:false,anchor:0,acc:0,level:0,brk:false,...(g.timer||{})};
-  const dur=(t.brk?brkMin(g):(+g.levelMin||TYPES[g.type].min))*60000;
+  const dur=(t.brk?brkMin(g):(+g.levelMin||T(g.type).min))*60000;
   const raw=(t.acc||0)+(t.running?Date.now()-t.anchor:0);
   const done=raw>=dur, el=Math.min(raw,dur);
   return {t,dur,el,over:raw-dur,level:t.level||0,brk:!!t.brk,rem:dur-el,running:!!t.running&&!done,done,
@@ -978,20 +996,20 @@ const tooEarly=(g,ts)=>!ts.started&&Date.now()<startAt(g);
 // Una partida se puede terminar recién cuando empezó: se arrancó el reloj o ya pasó la hora programada.
 const canFinish=g=>tstate(g).started||Date.now()>=startAt(g);
 const startLabel=g=>g.date===today()?`Empieza a las ${g.time||'00:00'}`:`Empieza el ${fmtDate(g.date)}${g.time?' a las '+g.time:''}`;
-const rebuyClosed=ts=>ts.level>REBUY_CUT||ts.brk||(ts.level===REBUY_CUT&&ts.done);
-const canKO=(g,ts)=>g.status!=='closed'&&(g.type==='mie'?ts.started:rebuyClosed(ts));
+const rebuyClosed=(ts,g)=>{const c=cutOf(g);return ts.level>c||ts.brk||(ts.level===c&&ts.done)};
+const canKO=(g,ts)=>g.status!=='closed'&&(isLibre(g)?rebuyClosed(ts,g):ts.started);
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
 // "Cebolla": el primero que queda afuera de los puntos (3º en Rápido, 4º en Con rebuy)
-const cebPlace=type=>TYPES[type].pts.length+1;
-function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,TYPES[g.type].pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});r.ceb=Object.keys(c.place).find(id=>c.place[id]===cebPlace(g.type))||'';return r}
+const cebPlace=type=>T(type).pts.length+1;
+function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,T(g.type).pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});r.ceb=Object.keys(c.place).find(id=>c.place[id]===cebPlace(g.type))||'';return r}
 const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
-function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level)}`}
+function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level,g)}`}
 function ladder(g,ts){
-  const vie=g.type==='vie',hasBrk=brkMin(g)>0;
-  return BLINDS.map((b,i)=>{
+  const vie=isLibre(g),hasBrk=brkMin(g)>0,CUT=cutOf(g);
+  return blindsOf(g).map((b,i)=>{
     const cur=i===ts.level&&!ts.brk,past=i<ts.level||(i===ts.level&&ts.brk);
-    let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===REBUY_CUT?'cut':''}">${b}-${b*2}</span>`;
-    if(i===REBUY_CUT&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>REBUY_CUT?'past':''}">Break ${brkMin(g)}'</span>`;
+    let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===CUT?'cut':''}">${b}-${b*2}</span>`;
+    if(i===CUT&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>CUT?'past':''}">Break ${brkMin(g)}'</span>`;
     return h;
   }).join('');
 }
@@ -1000,12 +1018,12 @@ function stats(type,noPrev){
   const out={};
   for(const [id,p] of Object.entries(S.players)) out[id]={id,name:p.name,since:p.since||'',active:p.active!==false,ceb:0,pj:0,eligible:0,p1:0,p2:0,p3:0,pts:0,rb:0,won:0,ate:0};
   for(const g of games){
-    const c=calc(g),t=TYPES[g.type],res=g.result||{};
+    const c=calc(g),t=T(g.type),res=g.result||{};
     for(const o of Object.values(out)) if(!o.since||g.date>=o.since) o.eligible++;
     for(const id of c.playing){
       const o=out[id];if(!o)continue;
       o.pj++;
-      if(g.type==='vie')o.rb+=c.parts[id].rb||0;else if(c.parts[id].rq)o.rb++;
+      if(isLibre(g))o.rb+=c.parts[id].rb||0;else if(c.parts[id].rq)o.rb++;
       if(c.parts[id].st==='come')o.ate++;
     }
     if(res.ceb&&out[res.ceb])out[res.ceb].ceb++;
@@ -1055,7 +1073,7 @@ function render(){
 }
 
 // Quien juega solo los viernes ve la app como si no existieran los miércoles y sin la Tabla (los admins ven todo).
-const soloVie=()=>{const m=me();return !!(m&&S.players[m]?.days==='vie'&&!(isFB()&&isAdmin()))};
+const soloVie=()=>{const m=me();return !!(dosDias()&&m&&S.players[m]?.days==='vie'&&!(isFB()&&isAdmin()))};
 const games=()=>Object.entries(S.games).filter(([,g])=>!(soloVie()&&g.type==='mie'));
 function openGames(){
   return games().filter(([,g])=>g.status!=='closed').sort((a,b)=>(a[1].date+(a[1].time||'')).localeCompare(b[1].date+(b[1].time||'')));
@@ -1077,35 +1095,35 @@ function vPartida(){
 }
 function vNewGame(){
   const np=Object.values(S.players).filter(p=>p.active!==false).length;
-  const ty=ui.newType,date=ui.newDate||nextDow(TYPES[ty].dow);
-  const opt=(k,pip,title,items)=>`<button class="opt ${k}" data-act="newType" data-v="${k}" data-pip="${pip}" aria-pressed="${ty===k}">
-      <span class="badge ${k}">${esc(TYPES[k].name)}</span><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></button>`;
+  if(!TYPES[ui.newType]||(soloVie()&&ui.newType!=='vie'))ui.newType=soloVie()?'vie':typeKeys()[0];
+  const ty=ui.newType,date=ui.newDate||nextDow(T(ty).dow);
+  const RBTXT={una:'1 recompra incluida en la entrada',no:'Sin recompra'};
+  const opt=k=>{const y=T(k),c=tcls(k);return `<button class="opt ${c}" data-act="newType" data-v="${k}" data-pip="${c==='vie'?'♥':'♣'}" aria-pressed="${ty===k}">
+      <span class="badge ${c}">${esc(y.name)}</span><h3>Tipo ${DIAS[y.dow]}</h3><ul>${['Niveles de '+y.min+' min',y.rb==='libre'?'Rebuys hasta terminar '+blind(cutOf({type:k}),{type:k}):RBTXT[y.rb||'una'],'Puntos '+y.pts.join(' · '),'Premio '+y.split.join(' / ')].map(i=>`<li>${i}</li>`).join('')}</ul></button>`};
+  const keys=typeKeys().filter(k=>!soloVie()||k==='vie');
   return `<section class="card" data-suit="♠">
     <h2>Programar partida</h2>
     ${np?'':`<p class="muted">Primero cargá los jugadores en la solapa <b>Jugadores</b>.</p>`}
-    <div class="typepick">
-      ${soloVie()?'':opt('mie','♣','Tipo '+DIAS[TYPES.mie.dow],['Niveles de '+TYPES.mie.min+' min','1 recompra incluida en la entrada','Puntos '+TYPES.mie.pts.join(' · '),'Premio '+TYPES.mie.split.join(' / ')])}
-      ${opt('vie','♥','Tipo '+DIAS[TYPES.vie.dow],['Niveles de '+TYPES.vie.min+' min','Rebuys hasta terminar 10-20','Puntos '+TYPES.vie.pts.join(' · '),'Premio '+TYPES.vie.split.join(' / ')])}
-    </div>
+    <div class="typepick ${keys.length===1?'one':''}">${keys.map(opt).join('')}</div>
     <div class="fields">
       <label><span class="label">Fecha</span><input type="date" id="nd-date" data-chg="nd" data-k="newDate" value="${date}"></label>
       <label><span class="label">Hora (opcional)</span><input type="time" id="nd-time" data-chg="nd" data-k="newTime" value="${esc(ui.newTime)}"></label>
       <label><span class="label">Repetir semanalmente</span><select id="nd-reps" data-chg="nd" data-k="newReps">${[1,2,3,4,6,8,12].map(n=>`<option value="${n}" ${+ui.newReps===n?'selected':''}>${n===1?'Solo esta fecha':n+' semanas'}</option>`).join('')}</select></label>
     </div>
-    <div class="row"><button class="btn ${ty==='mie'?'pri':'vie'}" data-act="newGame">Programar ${+ui.newReps>1?ui.newReps+' partidas':'partida'} ${TYPES[ty].name.toLowerCase()}</button>
+    <div class="row"><button class="btn ${tcls(ty)==='mie'?'pri':'vie'}" data-act="newGame">Programar ${+ui.newReps>1?ui.newReps+' partidas':'partida'} ${T(ty).name.toLowerCase()}</button>
       <span class="small muted">${fmtDate(date)}${+ui.newReps>1?' y las '+(ui.newReps-1)+' semanas siguientes':''}</span></div>
   </section>`;
 }
 
 function vGame(gid,g){
-  const t=TYPES[g.type],c=calc(g),parts=g.parts||{},closed=g.status==='closed',m=me();
-  const ts=tstate(g),rbClosed=g.type==='vie'&&rebuyClosed(ts);
+  const t=T(g.type),c=calc(g),parts=g.parts||{},closed=g.status==='closed',m=me();
+  const ts=tstate(g),rbClosed=isLibre(g)&&rebuyClosed(ts,g);
   const list=sortedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
     let extra='<span></span>';
-    if(plays&&g.type==='mie') extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Ya usó su recompra (tocá para deshacer)':'Recompra disponible: tocá cuando la pida'}" aria-label="${pt.rq?'Recompra usada':'Recompra disponible'}">${pt.rq?'R✓':'R'}</button>`;
-    if(plays&&g.type==='vie') extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
+    if(plays&&isUna(g)) extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Ya usó su recompra (tocá para deshacer)':'Recompra disponible: tocá cuando la pida'}" aria-label="${pt.rq?'Recompra usada':'Recompra disponible'}">${pt.rq?'R✓':'R'}</button>`;
+    if(plays&&isLibre(g)) extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
     const ajena=isFB()&&!isAdmin()&&m&&id!==m;
     const seg=[['no','✕'],['juega','♠'],['come','🍽']].map(([k,l])=>`<button data-act="st" data-pid="${id}" ${ajena?'disabled':''} data-v="${k}" class="${k==='come'?'emo ':''}${st===k?'on-'+k:''}" ${closed?'disabled':''} aria-pressed="${st===k}" aria-label="${ST[k]}">${l}</button>`).join('');
     return `<div class="arow ${id===m?'mine':''} ${st==='no'?'out':''}">${avBtn(id,30)}<span class="aname">${esc(p.name)}${ptag(id)}${id===m?' <span class="badge me">Vos</span>':''}${p.active===false?' <span class="small muted">(ret.)</span>':''}</span>${extra}<div class="aseg">${seg}</div></div>`;
@@ -1115,7 +1133,7 @@ function vGame(gid,g){
   return `
   <section class="card head" data-suit="♦">
     <div class="row spread">
-      <div class="row"><span class="badge ${g.type}">${t.name}</span>${closed?'<span class="badge gold">Cerrada</span>':g.date>today()?'<span class="badge gold">Programada</span>':''}</div>
+      <div class="row"><span class="badge ${tcls(g.type)}">${t.name}</span>${closed?'<span class="badge gold">Cerrada</span>':g.date>today()?'<span class="badge gold">Programada</span>':''}</div>
       ${closed||!canFinish(g)?'':`<button class="btn" data-act="goResult">Terminar partida ↓</button>`}
     </div>
     ${g.title?`<div class="gtitle">${gTitle(g)}</div>`:''}
@@ -1133,7 +1151,7 @@ function vGame(gid,g){
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[2],String(c.playing.length))}</span>`}<span class="label">Entraron</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[3],String(c.alive.length))}</span>`}<span class="label">Quedan</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[9],String(c.eaters.length))}</span>`}<span class="label">Comen</span></div>
-      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[0],String(c.rebuys))}</span>`}<span class="label">${g.type==='vie'?'Rebuys':'Recompras'}</span></div>
+      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[0],String(c.rebuys))}</span>`}<span class="label">${isLibre(g)?'Rebuys':'Recompras'}</span></div>
       <div class="plaque"><span class="label">Pozo</span><b class="num">${money(c.pot)}</b></div>
     </div>
   </section>
@@ -1144,7 +1162,7 @@ function vGame(gid,g){
 
   <section class="card r" data-suit="♥">
     <div class="row spread"><h2>Asistencia</h2><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span></div>
-    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${g.type==='mie'?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':'<span><b>− +</b> rebuys</span>'}</div>
+    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${isUna(g)?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':isLibre(g)?'<span><b>− +</b> rebuys</span>':''}</div>
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
   </section>
 
@@ -1154,18 +1172,18 @@ function vGame(gid,g){
     <h2>Cuentas</h2>
     <div class="fields">
       <label><span class="label">Entrada</span><input type="text" inputmode="numeric" class="money" id="g-entry" data-chg="num" data-k="entry" value="${moneyIn(g.entry)}" ${closed?'disabled':''}></label>
-      <label><span class="label">Precio ${g.type==='vie'?'rebuy':'recompra'} </span><input type="text" inputmode="numeric" class="money" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${moneyIn(g.rebuyPrice)}" placeholder="${g.type==='mie'?'0 = incluida':''}" ${closed?'disabled':''}></label>
+      ${rbm(g)==='no'?'':`<label><span class="label">Precio ${isLibre(g)?'rebuy':'recompra'} </span><input type="text" inputmode="numeric" class="money" id="g-rbp" data-chg="num" data-k="rebuyPrice" value="${moneyIn(g.rebuyPrice)}" placeholder="${isUna(g)?'0 = incluida':''}" ${closed?'disabled':''}></label>`}
       <label><span class="label">Comida</span>${c.perPerson
         ?`<input type="text" inputmode="numeric" class="money" id="g-foodpp" data-chg="num" data-k="foodPP" value="${moneyIn(g.foodPP)}" placeholder="Por persona" ${closed?'disabled':''}>`
         :`<input type="text" inputmode="numeric" class="money" id="g-food" data-chg="num" data-k="food" value="${moneyIn(g.food)}" placeholder="Total de la comida" ${closed?'disabled':''}>`}<span class="fmode">${[['pp','Por persona'],['total','Total']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${foodModeOf(g)===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
       <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
-    <div class="small muted">${g.type==='mie'&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${g.type==='vie'?'rebuy':'recompra'} × ${c.rebuys}.`}
+    <div class="small muted">${rbm(g)==='no'?`Pozo = entrada × ${c.playing.length} jugadores.`:isUna(g)&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${isLibre(g)?'rebuy':'recompra'} × ${c.rebuys}.`}
       ${c.eaters.length?(c.perPerson?` Comida: <b>${money(c.foodShare)}</b> por persona × ${c.eaters.length} = ${money(c.food)}.`:` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`):''}</div>
     <div class="prizes">${c.prizes.map((p,i)=>`<div class="prize ${i?'':'p1'}"><span class="label">${i+1}º · ${t.split[i]}% · ${t.pts[i]} pts</span><b class="num">${money(p)}</b></div>`).join('')}</div>
     ${c.playing.length?`<div class="tw"><table class="num">
-      <thead><tr><th>Jugador</th><th class="r">Entrada</th><th class="r">${g.type==='vie'?'Rebuys':'Recompra'}</th><th class="r">Comida</th><th class="r">Paga</th></tr></thead>
+      <thead><tr><th>Jugador</th><th class="r">Entrada</th><th class="r">${isLibre(g)?'Rebuys':'Recompra'}</th><th class="r">Comida</th><th class="r">Paga</th></tr></thead>
       <tbody>${c.playing.map(id=>{const o=c.owes[id];return `<tr><td><span class="who">${avatar(id,24)}${esc(pname(id))}</span></td><td class="r">${money(o.entry)}</td><td class="r">${o.n?`<span class="muted">${o.n} ×</span> ${o.rb?money(o.rb):'incl.'}`:'—'}</td><td class="r">${o.food?money(o.food):'—'}</td><td class="r"><b>${money(o.total)}</b></td></tr>`}).join('')}</tbody>
       <tfoot><tr><td>Total</td><td class="r">${money((+g.entry||0)*c.playing.length)}</td><td class="r">${c.rebuys?`<span class="muted">${c.rebuys} ×</span> ${+g.rebuyPrice?money((+g.rebuyPrice)*c.rebuys):'incl.'}`:'—'}</td><td class="r">${money(c.eaters.length?c.food:0)}</td><td class="r">${money(Object.values(c.owes).reduce((s,o)=>s+o.total,0))}</td></tr></tfoot>
     </table></div>`:''}
@@ -1236,20 +1254,20 @@ function vKO(g,c,ts){
   const standing=Object.keys(c.place).sort((a,b)=>c.place[a]-c.place[b]);
   const chips=c.alive.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>{
     const armed=ui.armed==='ko-'+id;
-    return `<button class="kochip ${armed?'armed':''}" data-act="ko" data-pid="${id}" ${on&&!winner?'':'disabled'}>${avatar(id,26)}<span>${armed?'¿Afuera? tocá de nuevo':esc(pname(id))}</span>${g.type==='mie'&&!armed?(c.parts[id]?.rq?'<span class="rqtag used" title="Ya usó su recompra">R✓ usada</span>':'<span class="rqtag free" title="Todavía tiene la recompra">R</span>'):''}</button>`;
+    return `<button class="kochip ${armed?'armed':''}" data-act="ko" data-pid="${id}" ${on&&!winner?'':'disabled'}>${avatar(id,26)}<span>${armed?'¿Afuera? tocá de nuevo':esc(pname(id))}</span>${isUna(g)&&!armed?(c.parts[id]?.rq?'<span class="rqtag used" title="Ya usó su recompra">R✓ usada</span>':'<span class="rqtag free" title="Todavía tiene la recompra">R</span>'):''}</button>`;
   }).join('');
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Eliminaciones</h2><span class="badge gold">Quedan ${c.alive.length} de ${n}</span></div>
     ${closed?'':vAviso(g,c)}
-    ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${g.type==='mie'?'cuando arranca el reloj':'cuando se cierra el rebuy (al terminar el 10-20)'}.</p>`
+    ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${isLibre(g)?'cuando se cierra el rebuy (al terminar el '+blind(cutOf(g),g)+')':'cuando arranca el reloj'}.</p>`
       :winner?`<div class="donemsg">🏆 Ganó ${esc(pname(winner))}. Revisá el resultado y cerrá la partida.</div>`
       :`<p class="muted small" style="margin:0">Tocá dos veces a quien queda afuera. El primero en caer queda ${n}º.</p>`}
     ${winner?'':`<div class="kolist">${chips}</div>`}
-    ${standing.length?`<ol class="kos">${standing.map(id=>`<li class="${c.place[id]<=TYPES[g.type].pts.length?'pod':''}"><b class="num">${c.place[id]}º</b>${avatar(id,26)}<span class="nm">${esc(pname(id))}</span>${c.place[id]===1?'<span class="small muted">ganador</span>':closed?'':`<button class="btn undo" data-act="unko" data-pid="${id}" title="Vuelve a estar en juego">↩ Volver</button>`}</li>`).join('')}</ol>`:''}
+    ${standing.length?`<ol class="kos">${standing.map(id=>`<li class="${c.place[id]<=T(g.type).pts.length?'pod':''}"><b class="num">${c.place[id]}º</b>${avatar(id,26)}<span class="nm">${esc(pname(id))}</span>${c.place[id]===1?'<span class="small muted">ganador</span>':closed?'':`<button class="btn undo" data-act="unko" data-pid="${id}" title="Vuelve a estar en juego">↩ Volver</button>`}</li>`).join('')}</ol>`:''}
   </section>`;
 }
 function vResult(gid,g,c){
-  const t=TYPES[g.type],res=g.result||{},closed=g.status==='closed';
+  const t=T(g.type),res=g.result||{},closed=g.status==='closed';
   const keys=['p1','p2','p3'].slice(0,t.pts.length);
   const others=sortedPlayers().filter(([id,p])=>p.active!==false&&!c.playing.includes(id)).map(([id])=>id);
   const all=[...keys,'ceb'];
@@ -1283,7 +1301,7 @@ function podium(items){
 }
 
 function vTimer(g,ts,big){
-  const vie=g.type==='vie',rbClosed=vie&&rebuyClosed(ts);
+  const vie=isLibre(g),rbClosed=vie&&rebuyClosed(ts,g);
   const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
   const locked=ui.sound&&!audioOk();
   const main=ts.done?`<button class="btn gold go" data-act="tgo">▶ ${nextLabel(g,ts)}</button>`
@@ -1297,16 +1315,16 @@ function vTimer(g,ts,big){
       <button class="btn ${locked?'gold':''}" data-act="sound" aria-pressed="${ui.sound}">${!ui.sound?'🔕':locked?'🔔 Activar sonido':'🔔'}</button>
       <button class="btn" data-act="big">${big?'Salir (Esc)':'Proyectar'}</button>
     </div>`;
-  const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.level===REBUY_CUT?'Último nivel con rebuy (10-20)':'Rebuy abierto hasta terminar 10-20'}</div>`:'';
+  const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.level===cutOf(g)?'Último nivel con rebuy ('+blind(cutOf(g),g)+')':'Rebuy abierto hasta terminar '+blind(cutOf(g),g)}</div>`:'';
   const doneMsg=ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · esperando para arrancar</div>`:'';
-  const blindsNow=ts.brk?'Break':blind(ts.level);
-  const nextBl=ts.brk?blind(ts.level+1):(nextStage(g,ts.t).brk?'Break':blind(ts.level+1));
+  const blindsNow=ts.brk?'Break':blind(ts.level,g);
+  const nextBl=ts.brk?blind(ts.level+1,g):(nextStage(g,ts.t).brk?'Break':blind(ts.level+1,g));
   const clk=`${mm}:${String(ss).padStart(2,'0')}`;
   if(big) return {ctl,rb,clk,doneMsg,blindsNow,nextBl};
   return `<section class="card timer ${ts.done?'isdone':''}">
     <div class="tgrid">
       <div class="dealer" aria-label="${stageName(ts)}">${ts.brk?'<div><small>BREAK</small><b>☕</b></div>':`<div><small>NIVEL</small><b>${ts.level+1}</b></div>`}</div>
-      <div><div class="label">${ts.brk?'Break · '+brkMin(g):(+g.levelMin||TYPES[g.type].min)} min${ts.brk?'':' por nivel'}</div>
+      <div><div class="label">${ts.brk?'Break · '+brkMin(g):(+g.levelMin||T(g.type).min)} min${ts.brk?'':' por nivel'}</div>
         <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div></div>
       <div class="tb" style="text-align:right"><div class="label">Ciegas</div><div class="blinds">${blindsNow}</div>
         <div class="small onfelt">Próximas ${nextBl}</div></div>
@@ -1323,7 +1341,7 @@ function renderBig(){
   const [,g]=ui.big?currentGame():[];
   if(!ui.big){w.innerHTML='';return}
   if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
-  const ts=tstate(g),t=TYPES[g.type],c=calc(g),vie=g.type==='vie',parts=g.parts||{};
+  const ts=tstate(g),t=T(g.type),c=calc(g),vie=isLibre(g),parts=g.parts||{};
   const {ctl,rb,clk,doneMsg,blindsNow,nextBl}=vTimer(g,ts,true);
   const players=c.playing.map(id=>({id,name:pname(id),p:c.parts[id],pl:c.place[id]})).sort((a,b)=>(a.pl||0)-(b.pl||0)||a.name.localeCompare(b.name,'es')).sort((a,b)=>(!!a.p.ko)-(!!b.p.ko));
   const tag=x=>vie
@@ -1427,11 +1445,11 @@ function vJugadores(){
           <label><span class="label">Nombre</span><input type="text" id="rn-${id}" value="${esc(p.name)}" autocomplete="off"></label>
           <label><span class="label">Mano favorita</span><input type="text" id="rh-${id}" value="${esc(p.hand||'')}" placeholder="Ej.: 44, K9, AKs" maxlength="6" autocomplete="off" style="text-transform:uppercase"></label>
           <label><span class="label">Cumpleaños</span><input type="text" id="rb-${id}" inputmode="numeric" data-mask="fecha" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" value="${p.bday?p.bday.split('-')[1]+'/'+p.bday.split('-')[0]+(p.byear?'/'+p.byear:''):''}"></label>
-          <label><span class="label">Juega</span><select id="rd-${id}"><option value="">Miércoles y viernes</option><option value="vie" ${p.days==='vie'?'selected':''}>Solo viernes</option></select></label>
+          ${dosDias()?'':'<input type="hidden" id="rd-'+id+'" value="'+(p.days||'')+'">'}${!dosDias()?'':`<label><span class="label">Juega</span><select id="rd-${id}"><option value="">Miércoles y viernes</option><option value="vie" ${p.days==='vie'?'selected':''}>Solo viernes</option></select></label>`}
           <label class="full"><span class="label">Alias de Mercado Pago</span><input type="text" id="rm-${id}" value="${esc(p.mp||'')}" placeholder="${editaMp(id)?'Para que te puedan pagar (ej. juan.perez.mp)':'Solo lo carga '+esc(p.name)+' con su PIN'}" maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false" ${editaMp(id)?'':'disabled'}></label>
           <label class="full"><span class="label">Frase típica</span><input type="text" id="rp-${id}" value="${esc(p.phrase||'')}" placeholder="Ej.: Nadie baja ganando" maxlength="60" autocomplete="off"></label>
           <div class="row"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-act="editCancel">Cancelar</button></div></form>`
-        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${p.days==='vie'?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${p.bday?'🎂 '+fmtBday(p.bday)+' · ':''}${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div>${p.mp?`<div class="small mpline">MP: <b>${esc(p.mp)}</b> <button class="btn mini" data-act="copyAlias" data-v="${esc(p.mp)}">${ui.copied===p.mp?'Copiado ✓':'Copiar'}</button></div>`:''}</div></div>`;
+        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${dosDias()&&p.days==='vie'?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${p.bday?'🎂 '+fmtBday(p.bday)+' · ':''}${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div>${p.mp?`<div class="small mpline">MP: <b>${esc(p.mp)}</b> <button class="btn mini" data-act="copyAlias" data-v="${esc(p.mp)}">${ui.copied===p.mp?'Copiado ✓':'Copiar'}</button></div>`:''}</div></div>`;
       if(ui.editing===id)return `<div class="prow editing">${name}</div>`;
       return `<div class="prow">${name}<div class="row">
         ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Editar</button>`}
@@ -1447,7 +1465,7 @@ function vJugadores(){
 function vStats(){
   // "Por partido jugado": rendimiento sobre las veces que cada uno fue (sin la liga anterior, que no tiene partidas)
   const per=ui.statsMode==='pj',st=stats(ui.statsType,per);
-  const tabs=[['all','Todos'],['mie',TYPES.mie.name],['vie',TYPES.vie.name]].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
+  const tabs=[['all','Todos'],...(typeKeys().length>1?typeKeys().map(k=>[k,T(k).name]):[])].map(([k,l])=>`<button data-act="statsType" data-v="${k}" aria-current="${ui.statsType===k}">${l}</button>`).join('');
   const modes=[['total','Total'],['pj','Por partido jugado']].map(([k,l])=>`<button data-act="statsMode" data-v="${k}" aria-current="${(ui.statsMode||'total')===k}">${l}</button>`).join('');
   const dec=n=>n.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
   const pctOf=(a,b)=>b?Math.round(a/b*100)+'%':'—';
@@ -1484,7 +1502,7 @@ function vStats(){
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
     ${(()=>{const cb=st.rows.filter(r=>r.ceb).sort((a,b)=>b.ceb-a.ceb||a.name.localeCompare(b.name,'es'));if(!cb.length)return '';const mx=cb[0].ceb,kings=cb.filter(r=>r.ceb===mx);
       return `<div class="ceb">🧅 <span>El más cebolla: <b>${kings.map(r=>esc(r.name)).join(', ')}</b> · ${mx} ${mx===1?'vez':'veces'}</span></div>`})()}
-    <p class="small muted">${st.games} partidas cerradas. ${note} 🧅 = cebolla, el primero que queda sin puntos (3º en Rápido, 4º en Con rebuy).</p>
+    <p class="small muted">${st.games} partidas cerradas. ${note} 🧅 = cebolla, el primero que queda sin puntos (${typeKeys().map(k=>(T(k).pts.length+1)+'º en '+esc(T(k).name)).join(', ')}).</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
       <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}<span>${esc(r.name)}${ptag(r.id)}</span></span></td>${row(r)}</tr>`).join('')}</tbody>
@@ -1538,26 +1556,49 @@ function vigente(){
 
 // Panel de la dueña: torneos (nombre, link, clave, tipos de partida, jugadores) y quién ya entró.
 // Campos de un torneo (nombre, portada, lugar y tipos de partida): los usan "Editar" y "Nuevo torneo".
+// Tipo de partida por defecto para un torneo nuevo
+const TYPE_NEW={name:'Partida',dow:3,min:12,pts:[5,2],split:[70,30],rb:'una'};
+const RBOPT=[['una','Una recompra incluida en la entrada'],['libre','Rebuys libres hasta un nivel'],['no','Sin recompra']];
+// Tipos que se están editando en el formulario de un torneo (se pueden agregar y quitar)
+function tkeysOf(tid,t){ui.tkeys=ui.tkeys||{};if(!ui.tkeys[tid])ui.tkeys[tid]=t.types&&Object.keys(t.types).length?Object.keys(t.types):['t1'];return ui.tkeys[tid]}
+// Campos de un torneo (nombre, portada, lugar y tipos de partida): los usan "Editar" y "Nuevo torneo".
 function tourFields(tid,t){
-  const ty=k=>({...TYPES0[k],...(t.types&&t.types[k]||{})});
+  const keys=tkeysOf(tid,t);
+  const ty=k=>{const y={...(TYPES0[k]||TYPE_NEW),...(t.types&&t.types[k]||{})};y.rb=y.rb||(TYPES0[k]&&TYPES0[k].rb)||'una';return y};
   const tf=(k,f,lab,val,extra='')=>`<label><span class="label">${lab}</span><input type="text" id="tt-${tid}-${k}-${f}" value="${esc(val)}" ${extra}></label>`;
   return `<label><span class="label">Nombre del torneo</span><input type="text" id="te-${tid}-name" value="${esc(t.name||'')}" placeholder="Ej.: Amigos del club" maxlength="40"></label>
-          <label><span class="label">Frase de la portada</span><input type="text" id="te-${tid}-sub" value="${esc(t.subtitle||'')}" placeholder="Miércoles rápido · Viernes SUM" maxlength="60"></label>
+          <label><span class="label">Frase de la portada</span><input type="text" id="te-${tid}-sub" value="${esc(t.subtitle||'')}" placeholder="Ej.: Jueves de poker" maxlength="60"></label>
           <label><span class="label">Dirección por defecto</span><input type="text" id="te-${tid}-place" value="${esc(t.place||'')}" maxlength="120"></label>
           <label><span class="label">Link de Google Maps</span><input type="url" id="te-${tid}-map" value="${esc(t.map||'')}" placeholder="https://maps.app.goo.gl/…"></label>
-          ${['mie','vie'].map(k=>{const y=ty(k);return `<fieldset class="full ttype"><legend>${k==='mie'?'Partida con recompra (tipo miércoles)':'Partida con rebuy (tipo viernes)'}</legend><div class="edit">
-            ${tf(k,'name','Nombre',y.name,'maxlength="24"')}
-            <label><span class="label">Día</span><select id="tt-${tid}-${k}-dow">${DIAS.map((d,i)=>`<option value="${i}" ${+y.dow===i?'selected':''}>${d}</option>`).join('')}</select></label>
+          ${keys.map((k,i)=>{const y=ty(k),B=y.blinds&&y.blinds.length?y.blinds:BLINDS,cut=y.cut!=null?+y.cut:(B.indexOf(10)>=0?B.indexOf(10):REBUY_CUT);
+            return `<fieldset class="full ttype"><legend>${keys.length>1?'Tipo de partida '+(i+1):'Tipo de partida'}</legend><div class="edit">
+            ${tf(k,'name','Nombre',y.name,'maxlength="24" placeholder="Ej.: Rápido"')}
+            <label><span class="label">Día</span><select id="tt-${tid}-${k}-dow">${DIAS.map((d,j)=>`<option value="${j}" ${+y.dow===j?'selected':''}>${d}</option>`).join('')}</select></label>
             ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
-            ${tf(k,'pts','Puntos por puesto (ej. 7,3,1)',y.pts.join(','))}
+            <label><span class="label">Recompra</span><select class="rbsel" id="tt-${tid}-${k}-rb">${RBOPT.map(([v,l])=>`<option value="${v}" ${y.rb===v?'selected':''}>${l}</option>`).join('')}</select></label>
+            <label class="cutf"><span class="label">Rebuys hasta terminar el nivel</span><select id="tt-${tid}-${k}-cut">${B.map((b,j)=>`<option value="${j}" ${cut===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
+            ${tf(k,'pts','Puntos por puesto (hasta 3, ej. 7,3,1)',y.pts.join(','))}
             ${tf(k,'split','Premio en % (ej. 60,30,10)',y.split.join(','))}
-          </div></fieldset>`}).join('')}`;
+            <label class="full"><span class="label">Ciegas (la chica de cada nivel; la grande es el doble)</span><input type="text" id="tt-${tid}-${k}-blinds" value="${esc(B.join(', '))}" inputmode="numeric"></label>
+            ${keys.length>1?`<div class="row full"><button type="button" class="btn danger" data-act="tyDel" data-tid="${tid}" data-k="${k}">Quitar este tipo</button></div>`:''}
+          </div></fieldset>`}).join('')}
+          <div class="row full"><button type="button" class="btn" data-act="tyAdd" data-tid="${tid}">＋ Agregar otro tipo de partida</button></div>`;
 }
 function readTour(tid){
-  const g=id=>(document.getElementById(id)||{}).value.trim(),nums=v=>v.split(/[,; ]+/).filter(Boolean).map(Number);
-  const types={};for(const k of ['mie','vie']){const pts=nums(g(`tt-${tid}-${k}-pts`)),split=nums(g(`tt-${tid}-${k}-split`)),min=+g(`tt-${tid}-${k}-min`);
-    if(!pts.length||pts.some(isNaN)||!split.length||split.some(isNaN)||split.length!==pts.length||split.reduce((a,b)=>a+b,0)!==100||!(min>0))return {err:`Revisá "${g(`tt-${tid}-${k}-name`)}": minutos mayor a 0, y tantos puntos como porcentajes de premio, que sumen 100.`};
-    types[k]={name:g(`tt-${tid}-${k}-name`)||TYPES0[k].name,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split}}
+  const g=id=>((document.getElementById(id)||{}).value||'').trim(),nums=v=>v.split(/[,; ]+/).filter(Boolean).map(Number);
+  const types={};
+  for(const k of (ui.tkeys&&ui.tkeys[tid])||[]){
+    const nm=g(`tt-${tid}-${k}-name`)||'Partida',pts=nums(g(`tt-${tid}-${k}-pts`)),split=nums(g(`tt-${tid}-${k}-split`)),min=+g(`tt-${tid}-${k}-min`),rb=g(`tt-${tid}-${k}-rb`)||'una';
+    if(!pts.length||pts.length>3||pts.some(isNaN)||!split.length||split.some(isNaN)||split.length!==pts.length||split.reduce((a,b)=>a+b,0)!==100||!(min>0))
+      return {err:`Revisá "${nm}": minutos mayor a 0, y hasta 3 puestos con tantos puntos como porcentajes de premio, que sumen 100.`};
+    const bl=nums(g(`tt-${tid}-${k}-blinds`));
+    if(!bl.length||bl.some(x=>!(x>0))||bl.some((x,i)=>i&&x<=bl[i-1]))return {err:`Revisá las ciegas de "${nm}": números de menor a mayor, separados por coma.`};
+    const y={name:nm,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split,rb};
+    if(bl.join()!==BLINDS.join())y.blinds=bl;
+    if(rb==='libre')y.cut=Math.min(+g(`tt-${tid}-${k}-cut`)||0,bl.length-1);
+    types[k]=y;
+  }
+  if(!Object.keys(types).length)return {err:'El torneo necesita al menos un tipo de partida.'};
   const map=g(`te-${tid}-map`);if(map&&!safeUrl(map))return {err:'El link de Maps tiene que empezar con https://'};
   return {data:{name:g(`te-${tid}-name`),subtitle:g(`te-${tid}-sub`),place:g(`te-${tid}-place`),map,types}};
 }
@@ -1594,7 +1635,7 @@ function vPanel(){
   const nuevo=nuevoOpen?`<form data-form="tourNew" class="edit">
       <label><span class="label">Link (letras, números y guiones)</span><input type="text" id="tn-id" placeholder="amigos-club" maxlength="40" value="${tours[TID]?'':esc(TID)}"></label>
       <label><span class="label">Clave para entrar (opcional)</span><input type="text" id="tn-key" autocomplete="off" placeholder="vacío = entra cualquiera con el link"></label>
-      ${tourFields('_new',{name:tours[TID]?'':(TID==='rotativo'?'Poker Rotativo':''),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:TYPES0})}
+      ${tourFields('_new',{name:tours[TID]?'':(TID==='rotativo'?'Poker Rotativo':''),place:LUGAR.place,map:LUGAR.map,subtitle:'',types:tours[TID]?null:(TID==='rotativo'?TYPES0:null)})}
       <fieldset class="full ttype"><legend>Jugadores (se pueden sumar después)</legend>
         <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" class="tn-pl" id="tn-pl-${pid}" value="${pid}">${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div></fieldset>
       <div class="row full"><button class="btn pri" type="submit">Crear torneo</button>${tours[TID]?'<button class="btn" type="button" data-act="tourNewToggle">Cancelar</button>':''}</div></form>`
@@ -1745,7 +1786,7 @@ function vPortada(){
       <text x="180" y="204" text-anchor="middle" font-family="Oswald,Arial Narrow,sans-serif" font-weight="500" font-size="9" letter-spacing="1" fill="#FFF6EC" stroke="#3D0B08" stroke-width="2" paint-order="stroke">${cap2}</text>`:''}
       ${seats}
     </svg>
-    <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${cap?'':(soloVie()?esc(TYPES.vie.name):esc(tourSub()))}</span></div>
+    <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${cap?'':(soloVie()?esc(T('vie').name):esc(tourSub()))}</span></div>
     <button class="snap" data-act="snapMesa" title="Copiar una imagen de la mesa para compartir" aria-label="Copiar imagen de la mesa">${ui.snapOk?'✓':'<svg viewBox="0 0 32 26" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M4 6h6l2.5-3.5h7L22 6h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><circle cx="16" cy="15" r="6.2"/><circle cx="16" cy="15" r="3.8"/><rect x="5.2" y="9.2" width="2.8" height="2" rx="1" fill="currentColor" stroke="none"/></svg>'}</button>
   </section>`;
 }
@@ -1757,19 +1798,19 @@ function vInicio(){
     .sort((a,b)=>(b[1].date+(b[1].time||'')).localeCompare(a[1].date+(a[1].time||'')));
   let live;
   if(v){
-    const [id,g]=v,ts=tstate(g),c=calc(g),t=TYPES[g.type];
+    const [id,g]=v,ts=tstate(g),c=calc(g),t=T(g.type);
     const cur=currentGame()[0]===id;
     const mm=Math.floor(ts.rem/60000),ss=Math.floor(ts.rem%60000/1000);
     const state=ts.done?'Nivel terminado':ts.running?'En juego':ts.started?'En pausa':'Hoy, todavía no empezó';
     live=`<section class="card timer live">
-      <div class="row spread"><span class="badge ${g.type}">${t.name}</span><span class="livetag ${ts.running?'on':''}">${state}</span></div>
+      <div class="row spread"><span class="badge ${tcls(g.type)}">${t.name}</span><span class="livetag ${ts.running?'on':''}">${state}</span></div>
       ${g.title?`<div class="gtitle" style="color:var(--gold-hi)">${gTitle(g)}</div>`:''}
       <h2 style="color:var(--on-felt)">${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</h2>
       ${gPlace(g,'onfelt')}
       ${cumplesAviso(g)}
       <div class="livegrid">
         <div><div class="label">${stageName(ts)}</div><div class="clock ${ts.done?'done':''}" ${cur?'data-t="clock"':''}>${mm}:${String(ss).padStart(2,'0')}</div></div>
-        <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level)}</div></div>
+        <div><div class="label">Ciegas</div><div class="blinds">${ts.brk?'Break':blind(ts.level,g)}</div></div>
         <div><div class="label">Entraron</div><div class="blinds" style="color:var(--on-felt)">${c.playing.length}</div></div>
         <div><div class="label">Quedan</div><div class="blinds" style="color:var(--on-felt)">${c.alive.length}</div></div>
         <div><div class="label">Pozo</div><div class="blinds">${money(c.pot)}</div></div>
@@ -1781,7 +1822,7 @@ function vInicio(){
       <p class="muted" style="margin:0">${open.length?`El próximo es el ${fmtDate(open[0][1].date)}${open[0][1].time?' a las '+esc(open[0][1].time):''}.`:'No hay partidos programados.'}</p>
       <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
   const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
-      return `<button data-act="goGame" data-id="${id}"><span class="badge ${g.type}">${esc(TYPES[g.type].name)}</span>
+      return `<button data-act="goGame" data-id="${id}"><span class="badge ${tcls(g.type)}">${esc(T(g.type).name)}</span>
         <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}${cumplesPartido(g).length?' · 🎂 '+cumplesPartido(g).map(x=>esc(pname(x.id))).join(', '):''}</span></span>
         <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
   const medal=['🥇','🥈','🥉'];
@@ -1789,7 +1830,7 @@ function vInicio(){
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
       const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('')+(r.ceb&&r.p1?`<span class="pod" style="color:var(--muted)">🧅 <span class="nm">${esc(pname(r.ceb))}</span></span>`:'');
       return `<button data-act="goGame" data-id="${id}">
-        <span class="phd"><span class="badge ${g.type}">${esc(TYPES[g.type].name)}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
+        <span class="phd"><span class="badge ${tcls(g.type)}">${esc(T(g.type).name)}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
@@ -1878,14 +1919,14 @@ const ACT={
   newType:d=>{ui.newType=d.v;ui.newDate='';render()},
   newGame:async()=>{
     const type=ui.newType,prev=Object.values(S.games).filter(g=>g.type===type).sort((a,b)=>b.date.localeCompare(a.date))[0]||{};
-    const start=ui.newDate||nextDow(TYPES[type].dow),reps=+ui.newReps||1;
+    const start=ui.newDate||nextDow(T(type).dow),reps=+ui.newReps||1;
     let first=null;
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
       const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
-        entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||TYPES[type].min,breakMin:prev.breakMin??20,parts:{},result:{},
+        entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||T(type).min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
-      g.rebuyPrice=type==='vie'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
+      g.rebuyPrice=T(type).rb==='libre'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
       await Store.set('games',id,g);
     }
@@ -1915,7 +1956,7 @@ const ACT={
   big:()=>{ui.big=!ui.big;try{history.replaceState(null,'',ui.big?'#pantalla':location.pathname+location.search)}catch{}if(ui.big){try{document.documentElement.requestFullscreen?.().catch(()=>{})}catch{}}else{try{document.fullscreenElement&&document.exitFullscreen()}catch{}}render()},
   closeGame:()=>{
     {const [,g0]=currentGame();if(!canFinish(g0))return}
-    const [gid,g]=currentGame(),res=g.result||{},keys=['p1','p2','p3'].slice(0,TYPES[g.type].pts.length);
+    const [gid,g]=currentGame(),res=g.result||{},keys=['p1','p2','p3'].slice(0,T(g.type).pts.length);
     const c=calc(g),need=Math.min(keys.length,Math.max(c.playing.length,1));
     if(!keys.slice(0,need).every(k=>res[k])&&ui.armed!=='closeGame'){arm('closeGame');return}ui.armed=null;
     // los ganadores cuentan como que jugaron aunque no se haya cargado la asistencia
@@ -1960,7 +2001,11 @@ const ACT={
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
-  tourNewToggle:()=>{if(ui.tourNewOpen)clearDrafts(document.querySelector('form[data-form="tourNew"]'));ui.tourNewOpen=!ui.tourNewOpen;render()},
+  tyAdd:d=>{const k='t'+Date.now().toString(36);ui.tkeys[d.tid]=[...ui.tkeys[d.tid],k];render()},
+  tyDel:d=>{
+    if(d.tid===TID&&Object.values(S.games).some(g=>g.type===d.k)){ui.err='Hay partidas de ese tipo: no se puede quitar (cambiale el nombre o las condiciones).';render();return}
+    if(!confirm('¿Quitar este tipo de partida?'))return;ui.tkeys[d.tid]=ui.tkeys[d.tid].filter(k=>k!==d.k);render()},
+  tourNewToggle:()=>{if(ui.tourNewOpen&&ui.tkeys)delete ui.tkeys._new;if(ui.tourNewOpen)clearDrafts(document.querySelector('form[data-form="tourNew"]'));ui.tourNewOpen=!ui.tourNewOpen;render()},
   copyLink:d=>{try{navigator.clipboard.writeText(d.v).then(()=>{ui.moveMsg=null;alert('Link copiado: '+d.v)})}catch{prompt('Copiá el link:',d.v)}},
   tourReask:d=>{if(ui.armed!=='reask-'+d.v){arm('reask-'+d.v);return}ui.armed=null;const t=(ui.tours||{})[d.v];FB.saveTour(d.v,{keyV:(t&&t.keyV||1)+1}).catch(fail)},
   regOpen:d=>{ui.regOpen=ui.regOpen===d.rid?null:d.rid;render()},
@@ -2077,7 +2122,7 @@ document.addEventListener('submit',e=>{
     const pls=[...document.querySelectorAll('.tn-pl:checked')].map(x=>x.value);
     FB.saveTour(tid,{...r.data,keyV:1,open:!key,createdAt:Date.now()},key)
       .then(()=>Promise.all(pls.map(pid=>FB.setInTour(pid,tid,true))))
-      .then(()=>{ui.tourNewOpen=false;ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
+      .then(()=>{ui.tourNewOpen=false;delete ui.tkeys._new;ui.tourOpen=tid;ui.err=null;render()}).catch(fail);
     return;
   }
   if(f.dataset.form==='tourEdit'){
