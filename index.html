@@ -1509,7 +1509,10 @@ const ACT={
   pinClose:()=>{ui.pinFor=null;ui.pinErr=null;render()},
   pinBackdrop:(d,el,e)=>{if(e.target===el)ACT.pinClose()},
   pinReset:d=>{if(ui.armed!=='pinR-'+d.pid){arm('pinR-'+d.pid);return}ui.armed=null;FB.pinReset(d.pid).then(()=>{ui.moveMsg=null}).catch(fail)},
-  adminIn:()=>{FB.adminLogin().catch(fail)},
+  adminIn:()=>{FB.adminLogin().catch(e=>{
+    ui.err=e.code==='auth/operation-not-allowed'?'Falta activar el acceso con Google en Firebase (Authentication → Método de acceso → Google).'
+      :e.code==='auth/unauthorized-domain'?'Falta autorizar este sitio en Firebase (Authentication → Configuración → Dominios autorizados: '+location.hostname+').'
+      :'No se pudo entrar con Google ('+(e.code||e.message)+').';render()})},
   adminOut:()=>{FB.adminLogout().catch(fail)},
   adminAdd:()=>{},
   adminDel:d=>{const l=(ui.admins||[]).filter(x=>x!==d.v);FB.set('config','admins',{emails:l,pids:ui.adminPids||[]}).catch(fail)},
