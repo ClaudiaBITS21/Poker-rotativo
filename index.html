@@ -725,7 +725,8 @@ function renderConn(){
 function render(){
   // preserva foco y cursor si alguien escribe mientras llega un cambio
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
-  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],['stats','Tabla']]
+  if(soloVie()){if(ui.tab==='stats')ui.tab='inicio';ui.newType='vie'}
+  $('#tabs').innerHTML=[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']])]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
   $('#me').innerHTML=!ui.loaded?'':m?`<button class="mebtn" data-act="avOpen" data-pid="${m}">${avatar(m,30)}<span>${esc(pname(m))}</span></button>`
@@ -746,13 +747,16 @@ function render(){
   tick(true);
 }
 
+// Quien juega solo los viernes ve la app como si no existieran los miércoles y sin la Tabla (los admins ven todo).
+const soloVie=()=>{const m=me();return !!(m&&S.players[m]?.days==='vie'&&!(isFB()&&isAdmin()))};
+const games=()=>Object.entries(S.games).filter(([,g])=>!(soloVie()&&g.type==='mie'));
 function openGames(){
-  return Object.entries(S.games).filter(([,g])=>g.status!=='closed').sort((a,b)=>(a[1].date+(a[1].time||'')).localeCompare(b[1].date+(b[1].time||'')));
+  return games().filter(([,g])=>g.status!=='closed').sort((a,b)=>(a[1].date+(a[1].time||'')).localeCompare(b[1].date+(b[1].time||'')));
 }
 function currentGame(){
   const open=openGames();
   if(ui.gameId==='__new') return [null,null,open];
-  if(ui.gameId&&S.games[ui.gameId]) return [ui.gameId,S.games[ui.gameId],open];
+  if(ui.gameId&&S.games[ui.gameId]&&!(soloVie()&&S.games[ui.gameId].type==='mie')) return [ui.gameId,S.games[ui.gameId],open];
   // sin elección: la que tiene el reloj andando, si no la próxima por fecha, si no la última abierta
   const pick=open.find(([,g])=>g.timer?.running)||open.find(([,g])=>g.date>=today())||open[open.length-1];
   return pick?[pick[0],pick[1],open]:[null,null,open];
@@ -773,7 +777,7 @@ function vNewGame(){
     <h2>Programar partida</h2>
     ${np?'':`<p class="muted">Primero cargá los jugadores en la solapa <b>Jugadores</b>.</p>`}
     <div class="typepick">
-      ${opt('mie','♣','Tipo miércoles',['Niveles de 7 min','1 recompra incluida en la entrada','Puntos 5 · 2','Premio 70 / 30'])}
+      ${soloVie()?'':opt('mie','♣','Tipo miércoles',['Niveles de 7 min','1 recompra incluida en la entrada','Puntos 5 · 2','Premio 70 / 30'])}
       ${opt('vie','♥','Tipo viernes',['Niveles de 12 min','Rebuys hasta terminar 10-20','Puntos 7 · 3 · 1','Premio 60 / 30 / 10'])}
     </div>
     <div class="fields">
@@ -1187,14 +1191,14 @@ function vPortada(){
       ${chips(48,['#1B1713','#C1272D','#1F4FA8','#1B1713'])}${chips(312,['#17744B','#1B1713','#C1272D'])}
       ${card(107,'A','♠')}${card(141,'K','♥',1)}${card(175,'Q','♦',1)}${card(209,'J','♣')}${card(243,'10','♠')}
     </svg>
-    <div class="htx"><small>Torneo</small><b>Poker Rotativo</b><span>Miércoles rápido · Viernes con rebuy</span></div>
+    <div class="htx"><small>Torneo</small><b>Poker Rotativo</b><span>${soloVie()?'Viernes con rebuy':'Miércoles rápido · Viernes con rebuy'}</span></div>
   </section>`;
 }
 function vInicio(){
   const v=vigente(),rest=openGames().filter(([id])=>!v||id!==v[0]);
   // arriba: los que todavía se pueden anotar; abajo: los jugados (y los pasados que quedaron sin cerrar)
   const open=rest.filter(([,g])=>g.date>=today());
-  const played=[...Object.entries(S.games).filter(([,g])=>g.status==='closed'),...rest.filter(([,g])=>g.date<today())]
+  const played=[...games().filter(([,g])=>g.status==='closed'),...rest.filter(([,g])=>g.date<today())]
     .sort((a,b)=>(b[1].date+(b[1].time||'')).localeCompare(a[1].date+(a[1].time||'')));
   let live;
   if(v){
