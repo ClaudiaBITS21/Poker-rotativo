@@ -96,16 +96,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Avatar, mano favorita y frase de un jugador en un torneo (id = <torneo>_<jugador>): los edita cualquiera
+    // Nombre, avatar, mano favorita y frase de un jugador en un torneo (id = <torneo>_<jugador>): los edita cualquiera
     // que entró a ese torneo, igual que la ficha, sin tocar lo de los otros torneos.
     match /looks/{id} {
       allow read: if isMember(resource.data.tid);
       allow create: if isMember(request.resource.data.tid)
         && id == request.resource.data.tid + '_' + request.resource.data.pid
-        && request.resource.data.keys().hasOnly(['tid', 'pid', 'av', 'hand', 'phrase']);
+        && request.resource.data.keys().hasOnly(['tid', 'pid', 'name', 'av', 'hand', 'phrase']);
       allow update: if isMember(resource.data.tid)
         && request.resource.data.tid == resource.data.tid && request.resource.data.pid == resource.data.pid
-        && request.resource.data.keys().hasOnly(['tid', 'pid', 'av', 'hand', 'phrase']);
+        && request.resource.data.keys().hasOnly(['tid', 'pid', 'name', 'av', 'hand', 'phrase']);
       allow delete: if isAdmin();
     }
 

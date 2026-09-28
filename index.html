@@ -614,7 +614,7 @@ const FB={
     render();
   },
   dataOn:false,dunsub:[],
-  rebuild(){const L=ui.looks||{};S.players=Object.fromEntries(Object.entries(ui.allPlayers||{}).filter(([,p])=>p.ts&&p.ts[TID]).map(([id,p])=>[id,{...p,...(L[id]||{})}]))},
+  rebuild(){const L=ui.looks||{},own=l=>Object.fromEntries(Object.entries(l||{}).filter(([k,v])=>k!=='name'||v));S.players=Object.fromEntries(Object.entries(ui.allPlayers||{}).filter(([,p])=>p.ts&&p.ts[TID]).map(([id,p])=>[id,{...p,...own(L[id])}]))},
   startData(){
     const m=this.m,onErr=e=>{ui.err=e.code==='permission-denied'?'Firebase no deja leer los datos: revisá que estén pegadas las reglas de seguridad.':'Se perdió la conexión ('+e.code+'). Recargá la página.';ui.loaded=true;render()};
     this.dataOn=true;
@@ -1926,13 +1926,15 @@ function setTimer(gid,t){return Store.update('games',gid,{timer:t})}
 
 /* ---------- acciones ---------- */
 // Participación de cada jugador en un regalo: doc <regalo>__<jugador> en regpart (cada uno ve solo la suya)
-// Avatar, mano favorita y frase: en la versión pública son de cada torneo; el resto de la ficha es compartida.
-const LOOK=['av','hand','phrase'];
+// Nombre, avatar, mano favorita y frase: en la versión pública son de cada torneo; el resto de la ficha (PIN,
+// cumpleaños, alias de MP) es compartida. El jugador se identifica siempre por su id, no por el nombre.
+const LOOK=['name','av','hand','phrase'];
 function savePlayer(pid,patch){
   if(!isFB())return Store.update('players',pid,patch);
   const look={},rest={};for(const [k,v] of Object.entries(patch))(LOOK.includes(k)?look:rest)[k]=v;
   const ps=[];
   if(Object.keys(look).length)ps.push(Store.set('looks',TID+'_'+pid,{...Object.fromEntries(LOOK.map(k=>[k,S.players[pid]?.[k]??''])),...look,tid:TID,pid}));
+  if(look.name&&!(ui.allPlayers||{})[pid]?.name)rest.name=look.name;
   if(Object.keys(rest).length)ps.push(Store.update('players',pid,rest));
   return Promise.all(ps);
 }
