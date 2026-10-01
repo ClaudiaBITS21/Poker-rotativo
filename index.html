@@ -792,6 +792,8 @@ const ptag=id=>{const p=S.players[id]||{},c=handCards(p.hand),t=p.hand&&!c?p.han
   const f=p.phrase?`“${esc(p.phrase)}”`:'';
   return (c?' '+c:'')+(t?` <span class="ptxt">${esc(t)}</span>`:'')+(f?` <span class="ptxt">${f}</span>`:'')};
 const sortedPlayers=()=>Object.entries(S.players).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
+// Por puntaje (el de la tabla general: puntos, después 1º puestos, partidas jugadas y nombre)
+function rankedPlayers(){const pos=Object.fromEntries(stats('all').rows.map((r,i)=>[r.id,i]));return Object.entries(S.players).sort((a,b)=>(pos[a[0]]??1e9)-(pos[b[0]]??1e9)||a[1].name.localeCompare(b[1].name,'es'))}
 function nextDow(dow){const d=new Date();d.setDate(d.getDate()+(dow-d.getDay()+7)%7);return ymd(d)}
 const me=()=>{const id=isFB()?ui.session:ui.me;return id&&S.players[id]?id:null};
 const lock=id=>isFB()&&ui.pinflags&&ui.pinflags.has(id)?' 🔒':'';
@@ -1140,7 +1142,7 @@ function vNewGame(){
 function vGame(gid,g){
   const t=T(g.type),c=calc(g),parts=g.parts||{},closed=g.status==='closed',m=me();
   const ts=tstate(g),rbClosed=isLibre(g)&&rebuyClosed(ts,g);
-  const list=sortedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
+  const list=rankedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
     let extra='<span></span>';
@@ -1458,7 +1460,7 @@ function vAdmin(){
 }
 function vJugadores(){
   const st=stats('all'),by=Object.fromEntries(st.rows.map(r=>[r.id,r]));
-  const list=sortedPlayers(),m=me();
+  const list=rankedPlayers(),m=me();
   return vAdmin()+`<section class="card r" data-suit="♥">
     <h2>Jugadores</h2>
     <form class="row" data-form="addPlayer"><input type="text" id="np-name" placeholder="Nombre" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" type="submit">Agregar</button></form>
