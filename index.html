@@ -1875,7 +1875,7 @@ function vInicio(){
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
-  return vPortada()+live+next+vMisRegalos()+past;
+  return vPortada()+live+vMisRegalos()+next+past;
 }
 
 /* ---------- timer y alarma ---------- */
