@@ -515,8 +515,8 @@ const REBUY_CUT=BLINDS.indexOf(10); // en "con rebuy" el rebuy cierra al termina
 // Tipos de partida del torneo. Los del Rotativo son estos dos; cada torneo nuevo define los suyos.
 // rb: 'una' = una recompra incluida · 'libre' = rebuys hasta terminar el nivel cut · 'no' = sin recompra
 const TYPES={
-  mie:{name:'Rápido',dow:3,min:7,pts:[5,2],split:[70,30],rb:'una'},
-  vie:{name:'Con rebuy',dow:5,min:12,pts:[7,3,1],split:[60,30,10],rb:'libre'}
+  mie:{name:'Rápido',dow:3,time:'22:30',min:7,pts:[5,2],split:[70,30],rb:'una'},
+  vie:{name:'Con rebuy',dow:5,time:'22:30',min:12,pts:[7,3,1],split:[60,30,10],rb:'libre'}
 };
 const TYPES0=JSON.parse(JSON.stringify(TYPES));
 const T=k=>TYPES[k]||TYPES0[k]||Object.values(TYPES)[0];
@@ -1139,7 +1139,7 @@ function vNewGame(){
     <div class="typepick ${keys.length===1?'one':''}">${keys.map(opt).join('')}</div>
     <div class="fields">
       <label><span class="label">Fecha</span><input type="date" id="nd-date" data-chg="nd" data-k="newDate" value="${date}"></label>
-      <label><span class="label">Hora (opcional)</span><input type="time" id="nd-time" data-chg="nd" data-k="newTime" value="${esc(ui.newTime)}"></label>
+      <label><span class="label">Hora</span><input type="time" id="nd-time" data-chg="nd" data-k="newTime" value="${esc(ui.newTime||T(ty).time||'')}"></label>
       <label><span class="label">Repetir semanalmente</span><select id="nd-reps" data-chg="nd" data-k="newReps">${[1,2,3,4,6,8,12].map(n=>`<option value="${n}" ${+ui.newReps===n?'selected':''}>${n===1?'Solo esta fecha':n+' semanas'}</option>`).join('')}</select></label>
     </div>
     <div class="row"><button class="btn ${tcls(ty)==='mie'?'pri':'vie'}" data-act="newGame">Programar ${+ui.newReps>1?ui.newReps+' partidas':'partida'} ${T(ty).name.toLowerCase()}</button>
@@ -1590,7 +1590,7 @@ function vigente(){
 // Panel de la dueña: torneos (nombre, link, clave, tipos de partida, jugadores) y quién ya entró.
 // Campos de un torneo (nombre, portada, lugar y tipos de partida): los usan "Editar" y "Nuevo torneo".
 // Tipo de partida por defecto para un torneo nuevo
-const TYPE_NEW={name:'Partida',dow:3,min:12,pts:[5,2],split:[70,30],rb:'una'};
+const TYPE_NEW={name:'Partida',dow:3,time:'21:00',min:12,pts:[5,2],split:[70,30],rb:'una'};
 const RBOPT=[['una','Una recompra incluida en la entrada'],['libre','Rebuys libres hasta un nivel'],['no','Sin recompra']];
 // Tipos que se están editando en el formulario de un torneo (se pueden agregar y quitar)
 function tkeysOf(tid,t){ui.tkeys=ui.tkeys||{};if(!ui.tkeys[tid])ui.tkeys[tid]=t.types&&Object.keys(t.types).length?Object.keys(t.types):['t1'];return ui.tkeys[tid]}
@@ -1607,6 +1607,7 @@ function tourFields(tid,t){
             return `<fieldset class="full ttype"><legend>${keys.length>1?'Tipo de partida '+(i+1):'Tipo de partida'}</legend><div class="edit">
             ${tf(k,'name','Nombre',y.name,'maxlength="24" placeholder="Ej.: Rápido"')}
             <label><span class="label">Día</span><select id="tt-${tid}-${k}-dow">${DIAS.map((d,j)=>`<option value="${j}" ${+y.dow===j?'selected':''}>${d}</option>`).join('')}</select></label>
+            <label><span class="label">Hora de inicio</span><input type="time" id="tt-${tid}-${k}-time" value="${esc(y.time||'')}"></label>
             ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
             <label><span class="label">Recompra</span><select class="rbsel" id="tt-${tid}-${k}-rb">${RBOPT.map(([v,l])=>`<option value="${v}" ${y.rb===v?'selected':''}>${l}</option>`).join('')}</select></label>
             <label class="cutf"><span class="label">Rebuys hasta terminar el nivel</span><select id="tt-${tid}-${k}-cut">${B.map((b,j)=>`<option value="${j}" ${cut===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
@@ -1626,7 +1627,7 @@ function readTour(tid){
       return {err:`Revisá "${nm}": minutos mayor a 0, y hasta 3 puestos con tantos puntos como porcentajes de premio, que sumen 100.`};
     const bl=nums(g(`tt-${tid}-${k}-blinds`));
     if(!bl.length||bl.some(x=>!(x>0))||bl.some((x,i)=>i&&x<=bl[i-1]))return {err:`Revisá las ciegas de "${nm}": números de menor a mayor, separados por coma.`};
-    const y={name:nm,dow:+g(`tt-${tid}-${k}-dow`),min,pts,split,rb};
+    const y={name:nm,dow:+g(`tt-${tid}-${k}-dow`),time:g(`tt-${tid}-${k}-time`),min,pts,split,rb};
     if(bl.join()!==BLINDS.join())y.blinds=bl;
     if(rb==='libre')y.cut=Math.min(+g(`tt-${tid}-${k}-cut`)||0,bl.length-1);
     types[k]=y;
@@ -1963,10 +1964,13 @@ const ACT={
   newGame:async()=>{
     const type=ui.newType,prev=Object.values(S.games).filter(g=>g.type===type).sort((a,b)=>b.date.localeCompare(a.date))[0]||{};
     const start=ui.newDate||nextDow(T(type).dow),reps=+ui.newReps||1;
+    {const [y0,m0,d0]=start.split('-').map(Number),fechas=[...Array(reps)].map((_,i)=>ymd(new Date(y0,m0-1,d0+7*i)));
+     const dup=fechas.filter(f=>Object.values(S.games).some(g=>g.type===type&&g.date===f&&g.status!=='closed'));
+     if(dup.length&&!confirm('Ya hay una partida '+T(type).name+' programada el '+dup.map(fmtDate).join(', ')+'. ¿Programar otra igual?'))return}
     let first=null;
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
-      const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
+      const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||T(type).time||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
         entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||T(type).min,breakMin:prev.breakMin??20,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=T(type).rb==='libre'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
