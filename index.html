@@ -1752,7 +1752,7 @@ function mano(){
   const act=Object.entries(S.players).filter(([,p])=>p.active!==false);
   if(!ui.seats&&act.length>=2){
     const pool=shuffle(act);
-    ui.seats=pool.slice(0,Math.min(pool.length,5+rnd(2))).map(([id])=>id);
+    ui.seats=pool.slice(0,Math.min(pool.length,6)).map(([id])=>id);
   }
   const d=ui.deck,board=d.slice(0,5),seats=(ui.seats||[]).filter(id=>S.players[id]).map((id,i)=>({id,cards:d.slice(5+2*i,7+2*i)}));
   seats.forEach(x=>x.sc=best7([...x.cards,...board]));
