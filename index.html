@@ -2,6 +2,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0C0C0C">
 <title>Torneo Poker Rotativo</title>
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-title" content="Poker">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rye&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,800&family=Figtree:wght@400;500;600;700&display=swap">
@@ -936,6 +941,8 @@ function applyTour(){
   if(!TYPES[ui.newType])ui.newType=typeKeys()[0];
   if(t.place!=null)LUGAR.place=t.place;if(t.map!=null)LUGAR.map=t.map;
   document.title=ADMIN_HOME?'Administración · Torneos':'Torneo '+tourName();
+  // nombre que queda debajo del ícono al agregarlo a la pantalla de inicio
+  const at=document.querySelector('meta[name="apple-mobile-web-app-title"]');if(at)at.content=ADMIN_HOME?'Poker':tourName();
 }
 // Puntos de la liga anterior: dentro del torneo (Firebase) o en el jugador (claude.ai)
 const prevOf=p=>isFB()?(p.ts&&p.ts[TID]&&p.ts[TID].prev):p.prev;
