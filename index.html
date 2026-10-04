@@ -355,6 +355,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .giftlist{display:flex;flex-direction:column}.giftrow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}.giftrow:first-child{border-top:0}.giftrow .gw{display:flex;align-items:center;gap:10px;min-width:0}.giftrow.bd{flex-wrap:nowrap}.giftrow.bd .gw{flex:1}.giftrow.bd .row{flex-wrap:nowrap}
 a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .ufseg{display:flex;flex-wrap:wrap;gap:6px}.ufseg button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;min-height:32px}.ufseg button[aria-pressed="true"]{background:var(--felt-2);border-color:var(--felt-2);color:#FBEBD2}.ufseg button[aria-pressed="true"] .muted{color:#E8C9B8}
+.giftbar{display:flex;flex-direction:column;gap:6px;padding:8px 12px;border:1px solid rgba(222,173,110,.3);border-radius:12px;background:rgba(0,0,0,.14);color:var(--on-felt-mut);font-size:13px}.giftbar b{color:var(--on-felt)}.giftbar .gpend{color:#FFC9B8}.giftbar .grow{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap}.giftbar .gact{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.giftbar .btn.mini{background:transparent;color:var(--on-felt);border-color:rgba(222,173,110,.5)}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -924,11 +925,11 @@ function renderGift(w){
 }
 // Tarjeta en Inicio con los regalos en los que estás anotado y cuánto te toca
 function vMisRegalos(){
+  // franja discreta: lo de los regalos es secundario
   const items=misRegalos();if(!items.length)return '';
-  const estado=x=>x.paid?'<span class="resp si">Pagado ✓</span>':x.pay==='mp'?'<span class="resp pay">Avisaste que pagaste por MP · falta que lo confirmen</span>':x.pay==='partido'?'<span class="resp pay">Pagás en el partido</span>':'<span class="resp no">Pendiente</span>';
-  return `<section class="card" data-suit="♥"><h2>🎁 Regalos</h2>${items.map(({x,p,d})=>`<div class="regmine"><div><b>${esc(p.name)}</b> <span class="small muted">· cumple ${d.getDate()} ${MESES[d.getMonth()]}</span></div>
-    <div>${x.amt?`Te toca poner <b>${money(x.amt)}</b> · ${estado(x)}`:'<span class="small muted">Anotado. Todavía no se definió cuánto pone cada uno.</span>'}</div>
-    ${x.amt&&!x.paid&&x.pay!=='mp'?`${aliasBox(x.alias)}<div class="row"><button class="btn" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button>${x.pay?'':`<button class="btn" data-act="giftPay" data-v="partido" data-rid="${x.rid}">Pago en el partido</button>`}</div>`:''}</div>`).join('')}</section>`;
+  const estado=x=>x.paid?'pagado ✓':x.pay==='mp'?'avisaste que pagaste por MP':x.pay==='partido'?'pagás en el partido':'<b class="gpend">pendiente</b>';
+  return `<section class="giftbar">${items.map(({x,p,d})=>`<div class="grow"><span>🎁 <b>${esc(p.name)}</b> · ${d.getDate()} ${MESES[d.getMonth()]} · ${x.amt?`te toca <b>${money(x.amt)}</b>, ${estado(x)}`:'anotado, falta definir el monto'}</span>
+    ${x.amt&&!x.paid&&x.pay!=='mp'?`<span class="gact">${x.alias?`MP: <b>${esc(x.alias)}</b> <button class="btn mini" data-act="copyAlias" data-v="${esc(x.alias)}">${ui.copied===x.alias?'Copiado ✓':'Copiar'}</button>`:''}<button class="btn mini" data-act="giftPay" data-v="mp" data-rid="${x.rid}">Ya pagué por MP</button></span>`:''}</div>`).join('')}</section>`;
 }
 
 /* ---------- torneo (nombre, lugar y tipos de partida configurables por la dueña) ---------- */
@@ -1860,13 +1861,11 @@ function vInicio(){
       <div class="liveav">${c.playing.slice(0,14).map(pid=>avatar(pid,28)).join('')}${c.playing.length>14?`<span class="small onfelt">+${c.playing.length-14}</span>`:''}</div>
       <div class="row"><button class="btn gold go" data-act="goGame" data-id="${id}">Ver el partido en juego</button><button class="btn ghost" data-act="goBig" data-id="${id}">Pantalla grande</button></div>
     </section>`;
-  }else live=`<section class="card" data-suit="♠"><h2>No hay partido en juego</h2>
-      <p class="muted" style="margin:0">${open.length?`El próximo es el ${fmtDate(open[0][1].date)}${open[0][1].time?' a las '+esc(open[0][1].time):''}.`:'No hay partidos programados.'}</p>
-      <div class="row"><button class="btn pri" data-act="selGameTab" data-id="">Programar partido</button></div></section>`;
-  const next=open.length?`<section class="card r" data-suit="♥"><h2>Próximos</h2><p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
+  }else live='';
+  const next=`<section class="card r" data-suit="♥"><div class="row spread"><h2>Próximos</h2><button class="btn mini" style="margin-right:18px" data-act="selGameTab" data-id="">＋ Programar</button></div>${open.length?`<p class="small muted" style="margin:0">Inscripción abierta: entrá y marcá si jugás.</p><div class="hist">${open.map(([id,g])=>{const c=calc(g);
       return `<button data-act="goGame" data-id="${id}"><span class="badge ${tcls(g.type)}">${esc(T(g.type).name)}</span>
         <span>${g.title?`<span class="gtitle sm">${gTitle(g)}</span>`:''}<b>${fmtDate(g.date)}${g.time?' · '+esc(g.time):''}</b><span class="small muted" style="display:block">${c.playing.length} anotados${c.eaters.length?' · '+c.eaters.length+' comen':''}${cumplesPartido(g).length?' · 🎂 '+cumplesPartido(g).map(x=>esc(pname(x.id))).join(', '):''}</span></span>
-        <span class="small muted">Anotarme ›</span></button>`}).join('')}</div></section>`:'';
+        <span class="small muted">Anotarme ›</span></button>`}).join('')}</div>`:'<p class="empty" style="margin:0">No hay partidos programados.</p>'}</section>`;
   const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
@@ -1876,7 +1875,7 @@ function vInicio(){
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
-  return vPortada()+vMisRegalos()+live+next+past;
+  return vPortada()+live+next+vMisRegalos()+past;
 }
 
 /* ---------- timer y alarma ---------- */
