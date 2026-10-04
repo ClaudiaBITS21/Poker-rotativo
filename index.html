@@ -702,7 +702,8 @@ const FB={
       if(needTs){patch.ts={[TID]:prev?{prev}:{}};if(prev)res.prev++}
       if(Object.keys(patch).length){await add(m.doc(this.db,'players',id),patch,{merge:true});res.fields+=Object.keys(patch).length}
     }
-    for(const [id,g] of Object.entries(data.games||{})){if(S.games[id])continue;await add(m.doc(this.db,'games',id),{...g,tid:TID});res.games++}
+    // las partidas se traen solo la primera vez: después no se resucitan las que se borraron en la app
+    if(!Object.keys(S.games).length)for(const [id,g] of Object.entries(data.games||{})){await add(m.doc(this.db,'games',id),{...g,tid:TID});res.games++}
     await b.commit();
     return res;
   }
@@ -1654,7 +1655,7 @@ function vPanel(){
         </form>
         <form data-form="tourKey" data-tid="${tid}" class="row"><input type="text" id="tk-${tid}" placeholder="${t.open?'Poner una clave':'Nueva clave (vacío = sin clave)'}" autocomplete="off" style="flex:1;min-width:160px"><button class="btn" type="submit">${t.open?'Poner clave':'Cambiar clave'}</button></form>
         ${t.open?'':`<div class="row"><button class="btn ${ui.armed==='reask-'+tid?'armed':''}" data-act="tourReask" data-v="${tid}">${ui.armed==='reask-'+tid?'¿Seguro? Todos van a tener que ponerla otra vez':'Pedir la clave de nuevo a todos'}</button></div>`}
-        ${tid===TID?`<div class="aviso"><b>${Object.keys(S.games).length?'¿Volver a traer los datos de claude.ai?':'¿Traer los datos de claude.ai?'}</b> Jugadores, puntos anteriores y partidas del Rotativo.${Object.keys(S.games).length?' Solo completa lo que falta (jugadores o partidas nuevas, cumpleaños vacíos…); no pisa lo que ya se cambió acá.':''}<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
+        ${tid===TID?`<div class="aviso"><b>${Object.keys(S.games).length?'¿Volver a traer los datos de claude.ai?':'¿Traer los datos de claude.ai?'}</b> Jugadores, puntos anteriores y partidas del Rotativo.${Object.keys(S.games).length?' Solo completa datos que faltan de los jugadores (por ejemplo cumpleaños); no trae partidas otra vez ni pisa lo que ya se cambió acá.':''}<button class="btn gold ${ui.armed==='importar'?'armed':''}" data-act="importar">${ui.armed==='importar'?'¿Importar? Tocá de nuevo':'Importar datos'}</button></div>`:''}
         <div class="label">Jugadores de este torneo</div>
         <div class="tplayers">${allP.map(([pid,p])=>`<label class="chk"><input type="checkbox" data-chg="tourPl" data-tid="${tid}" data-pid="${pid}" ${p.ts&&p.ts[tid]?'checked':''}>${avatar(pid,22)}<span>${esc(p.name)}</span></label>`).join('')||'<span class="muted small">Todavía no hay jugadores.</span>'}</div>
       </div>`:''}
