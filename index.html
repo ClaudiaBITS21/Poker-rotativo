@@ -356,6 +356,8 @@ tfoot td{font-weight:700;border-bottom:0}
 a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .ufseg{display:flex;flex-wrap:wrap;gap:6px}.ufseg button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;min-height:32px}.ufseg button[aria-pressed="true"]{background:var(--felt-2);border-color:var(--felt-2);color:#FBEBD2}.ufseg button[aria-pressed="true"] .muted{color:#E8C9B8}
 .giftbar{display:flex;flex-direction:column;gap:6px;padding:8px 12px;border:1px solid rgba(222,173,110,.3);border-radius:12px;background:rgba(0,0,0,.14);color:var(--on-felt-mut);font-size:13px}.giftbar b{color:var(--on-felt)}.giftbar .gpend{color:#FFC9B8}.giftbar .grow{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap}.giftbar .gact{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.giftbar .btn.mini{background:transparent;color:var(--on-felt);border-color:rgba(222,173,110,.5)}
+.herobar{align-self:center;border:1px solid rgba(222,173,110,.35);background:rgba(0,0,0,.18);color:var(--on-felt-mut);border-radius:999px;padding:6px 16px;font-size:13px;font-weight:500;cursor:pointer}.herobar:hover{color:var(--on-felt)}.herobar span{color:var(--gold)}
+.hero .herohide{position:absolute;left:1.5%;bottom:1.5%;border:0;background:transparent;color:#FFF6EC;font-size:12px;opacity:.75;padding:6px;cursor:pointer;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}.hero .herohide:hover{opacity:1}
 .modal{position:fixed;inset:0;z-index:60;background:rgba(5,15,10,.6);display:grid;place-items:center;padding:16px;overflow:auto}
 .modal .card{width:100%;max-width:520px}
 .avprev{display:flex;align-items:center;gap:16px}
@@ -539,7 +541,7 @@ const EMOS=['🦈','🐟','🃏','🎩','😎','🤠','👑','💎','🍀','🔥
 
 /* ---------- estado ---------- */
 const S={players:{},games:{},regalos:{},regpart:{}};
-const ui={tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
+const ui={heroOpen:(()=>{try{return localStorage.getItem('poker.hero')==='1'}catch{return false}})(),tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
   armed:null,editing:null,err:null,loaded:false,avFor:null,avDraft:null,avTab:'chip'};
 try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
 try{ui.me=localStorage.getItem('poker.me')||null}catch{ui.me=null}
@@ -1584,7 +1586,9 @@ function vCumples(){
 const ayer=()=>{const d=new Date();d.setDate(d.getDate()-1);return ymd(d)};
 function vigente(){
   const open=openGames().filter(([,g])=>g.date>=ayer());
-  return open.find(([,g])=>g.timer?.running)||open.find(([,g])=>tstate(g).started)||open.find(([,g])=>g.date===today())||null;
+  // "en juego": el reloj ya arrancó, o falta menos de 1 hora para la hora de inicio (la de la partida o la del tipo)
+  const soon=g=>g.date===today()&&Date.now()>=startAt({...g,time:g.time||T(g.type).time||'00:00'})-3600e3;
+  return open.find(([,g])=>g.timer?.running)||open.find(([,g])=>tstate(g).started)||open.find(([,g])=>soon(g))||null;
 }
 
 
@@ -1798,7 +1802,8 @@ async function mesaPng(){
   }
   return await new Promise(ok=>cv.toBlob(ok,'image/png'));
 }
-function vPortada(){
+function vPortada(plegable){
+  if(plegable&&!ui.heroOpen)return `<button class="herobar" data-act="heroToggle" aria-expanded="false">🃏 Ver la mano repartida <span>▾</span></button>`;
   const red=s=>s===1||s===2,rk=r=>RKS[r]==='T'?'10':RKS[r];
   const card=(x,c,up)=>`<g transform="translate(${x} ${up?117:124})"><rect width="30" height="42" rx="4" fill="#FFFDF7" stroke="${up?'#E8C088':'#CFC6B4'}" stroke-width="${up?2:1}"/><text x="5" y="14" font-family="Playfair Display,Georgia,serif" font-weight="800" font-size="12" fill="${red(c.s)?'#C1272D':'#1B1713'}">${rk(c.r)}</text><text x="15" y="33" text-anchor="middle" font-size="17" fill="${red(c.s)?'#C1272D':'#1B1713'}">${SUI[c.s]}</text></g>`;
   const mini=(x,y,c,w)=>`<g transform="translate(${x} ${y})"><rect width="14" height="19" rx="2" fill="#FFFDF7" stroke="${w?'#FAE8B4':'#CFC6B4'}" stroke-width="${w?1.6:.8}"/><text x="7" y="8" text-anchor="middle" font-family="Figtree,system-ui,sans-serif" font-weight="700" font-size="7" fill="${red(c.s)?'#C1272D':'#1B1713'}">${rk(c.r)}</text><text x="7" y="16.5" text-anchor="middle" font-size="7.5" fill="${red(c.s)?'#C1272D':'#1B1713'}">${SUI[c.s]}</text></g>`;
@@ -1830,6 +1835,7 @@ function vPortada(){
       ${seats}
     </svg>
     <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${cap?'':(soloVie()?esc(T('vie').name):esc(tourSub()))}</span></div>
+    ${plegable?'<button class="herohide" data-act="heroToggle" aria-expanded="true">Ocultar ▴</button>':''}
     <button class="snap" data-act="snapMesa" title="Copiar una imagen de la mesa para compartir" aria-label="Copiar imagen de la mesa">${ui.snapOk?'✓':'<svg viewBox="0 0 32 26" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M4 6h6l2.5-3.5h7L22 6h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><circle cx="16" cy="15" r="6.2"/><circle cx="16" cy="15" r="3.8"/><rect x="5.2" y="9.2" width="2.8" height="2" rx="1" fill="currentColor" stroke="none"/></svg>'}</button>
   </section>`;
 }
@@ -1875,7 +1881,7 @@ function vInicio(){
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
       </button>`}).join('')}</div>`:`<p class="empty">Todavía no hay partidos cerrados. Cuando se cierra uno, aparece acá con el podio.</p>`}
   </section>`;
-  return vPortada()+live+vMisRegalos()+next+past;
+  return vPortada(true)+live+vMisRegalos()+next+past;
 }
 
 /* ---------- timer y alarma ---------- */
@@ -1899,6 +1905,8 @@ function tick(fromRender){
   if(ts.running&&!wake&&navigator.wakeLock&&document.visibilityState==='visible'){navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>wake=null)}).catch(()=>{})}
 }
 setInterval(()=>tick(false),250);
+// una vez por minuto: si una partida entró en la hora previa al inicio, pasa a "en juego" sin recargar
+setInterval(()=>{if(ui.tab!=='inicio'||!ui.loaded)return;const v=(vigente()||[])[0]||null;if(v!==ui.lastVig){ui.lastVig=v;render()}},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render()});
 // Los navegadores no dejan sonar nada hasta que la persona toca la página:
 // el primer toque o tecla crea y despierta el audio.
@@ -2047,6 +2055,7 @@ const ACT={
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   addPToggle:()=>{ui.addingP=!ui.addingP;render();if(ui.addingP)setTimeout(()=>{const i=$('#npg-name');i&&i.focus()})},
+  heroToggle:()=>{ui.heroOpen=!ui.heroOpen;try{localStorage.setItem('poker.hero',ui.heroOpen?'1':'0')}catch{}render()},
   userTour:d=>{ui.userTour=d.v;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
   tyAdd:d=>{const k='t'+Date.now().toString(36);ui.tkeys[d.tid]=[...ui.tkeys[d.tid],k];render()},
