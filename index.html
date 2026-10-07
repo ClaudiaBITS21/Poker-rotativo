@@ -1688,6 +1688,11 @@ function vPanel(){
     ${tours[TID]||ADMIN_HOME?'':`<div class="aviso"><b>El torneo de este link (${esc(TID)}) todavía no existe.</b> Crealo abajo en "Nuevo torneo" con el link <b>${esc(TID)}</b>.</div>`}
     ${Object.keys(tours).length?`<div class="tours">${Object.entries(tours).sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0)).map(tcard).join('')}</div>`:'<p class="empty">Todavía no hay torneos.</p>'}
   </section>
+  <section class="card" data-suit="♣"><h2>Administradores</h2>
+    <p class="small muted" style="margin:0">Pueden anotar a cualquiera (juega, come, no va), sumar jugadores, resetear PIN y borrar partidas, en todos los torneos donde estén.</p>
+    <div class="ufseg">${ADMIN_PIDS.map(pid=>`<span class="btn mini" style="cursor:default">${esc((ui.allPlayers||{})[pid]?.name||pid)} · fijo</span>`).join('')}${(ui.adminPids||[]).map(pid=>`<button class="btn mini" data-act="admDel" data-pid="${pid}" title="Quitar">${esc((ui.allPlayers||{})[pid]?.name||pid)} ✕</button>`).join('')}</div>
+    <div class="row"><select id="adm-add" style="flex:1;min-width:160px"><option value="">Sumar un administrador…</option>${allP.filter(([pid])=>!esAdminPid(pid)).map(([pid,p])=>`<option value="${pid}">${esc(p.name)}</option>`).join('')}</select><button class="btn pri" data-act="admAdd">Sumar</button></div>
+  </section>
   <section class="card r" data-suit="♥"><h2>Usuarios</h2>
     ${ufTabs}
     <p class="small muted" style="margin:0">${conPin} de ${uP.length} jugadores${uf?' de '+esc(tours[uf].name||uf):''} ya pusieron PIN. "Celulares" = en cuántos entraron con su PIN; "último ingreso" = la última vez que pusieron el PIN.</p>
@@ -2056,6 +2061,10 @@ const ACT={
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   addPToggle:()=>{ui.addingP=!ui.addingP;render();if(ui.addingP)setTimeout(()=>{const i=$('#npg-name');i&&i.focus()})},
   heroToggle:()=>{ui.heroOpen=!ui.heroOpen;try{localStorage.setItem('poker.hero',ui.heroOpen?'1':'0')}catch{}render()},
+  admAdd:()=>{const pid=(document.getElementById('adm-add')||{}).value;if(!pid)return;const pids=[...new Set([...(ui.adminPids||[]),pid])];
+    FB.m.setDoc(FB.m.doc(FB.db,'config','admins'),{pids},{merge:true}).catch(fail)},
+  admDel:d=>{if(!confirm('¿Quitarle los permisos de administrador a '+((ui.allPlayers||{})[d.pid]?.name||'este jugador')+'?'))return;
+    FB.m.setDoc(FB.m.doc(FB.db,'config','admins'),{pids:(ui.adminPids||[]).filter(x=>x!==d.pid)},{merge:true}).catch(fail)},
   userTour:d=>{ui.userTour=d.v;render()},
   tourOpen:d=>{ui.tourOpen=ui.tourOpen===d.v?null:d.v;render()},
   tyAdd:d=>{const k='t'+Date.now().toString(36);ui.tkeys[d.tid]=[...ui.tkeys[d.tid],k];render()},
