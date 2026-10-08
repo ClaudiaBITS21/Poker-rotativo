@@ -267,8 +267,15 @@ tfoot td{font-weight:700;border-bottom:0}
 .kos li.pod b{color:var(--gold-2)}
 .kos .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn.undo{min-height:28px;padding:0 10px;font-size:12px}
-.proj .pplayers li.ko{opacity:.45}
-.proj .pplayers li.ko .nm{text-decoration:line-through;font-weight:500}
+.proj .pplayers li.ko{border:0;padding:0;font-size:.78em;line-height:1.35;color:var(--pmut);gap:calc(.5*var(--pw))}
+.proj .pplayers li.ko b{min-width:2.2em;text-align:right;font-weight:500}
+.proj .pplayers li.ko .nm{font-weight:500}
+.proj .pplayers li:not(.ko)+li.ko{margin-top:calc(.5*var(--pw))}
+.proj .pmesas{display:grid;grid-template-columns:1fr 1fr;gap:calc(1.6*var(--pw));min-height:0;overflow:hidden}
+.proj .pmesas .pplayers li:not(.ko){padding:calc(.15*var(--pw)) 0}
+.proj .pmesas .pplayers .av{width:1.4em;height:1.4em}
+.proj .pmesas>div{display:flex;flex-direction:column;gap:calc(.3*var(--pw));min-width:0}
+.dbtn{display:inline-grid;place-items:center;width:1.45em;height:1.45em;flex:none;border-radius:50%;background:#fff;color:#111;border:1px solid #999;font-family:var(--num);font-weight:700;font-size:.8em;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 .edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;width:100%}
 @media (max-width:520px){.edit{grid-template-columns:1fr}}
 .edit .full{grid-column:1/-1}
@@ -1027,7 +1034,8 @@ const tooEarly=(g,ts)=>!ts.started&&Date.now()<startAt(g);
 const canFinish=g=>tstate(g).started||Date.now()>=startAt(g);
 const startLabel=g=>g.date===today()?`Empieza a las ${g.time||'00:00'}`:`Empieza el ${fmtDate(g.date)}${g.time?' a las '+g.time:''}`;
 const rebuyClosed=(ts,g)=>{const c=cutOf(g);return ts.level>c||ts.brk||(ts.level===c&&ts.done)};
-const canKO=(g,ts)=>g.status!=='closed'&&(isLibre(g)?rebuyClosed(ts,g):ts.started);
+// sin reloj, se puede eliminar desde la hora de inicio; con reloj, en Con rebuy recién cuando se cierra el rebuy
+const canKO=(g,ts)=>g.status!=='closed'&&(ts.started?(!isLibre(g)||rebuyClosed(ts,g)):Date.now()>=startAt(g));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
 // "Cebolla": el primero que queda afuera de los puntos (3º en Rápido, 4º en Con rebuy)
 const cebPlace=type=>T(type).pts.length+1;
@@ -1071,7 +1079,16 @@ function renderConn(){
   el.className='conn '+(Store.mode==='db'||Store.mode==='fb'?'ok':Store.mode==='local'?'local':'');
   el.lastElementChild.textContent=Store.mode==='fb'?'Conectado a la liga':Store.mode==='db'?'Datos compartidos con el grupo':Store.mode==='local'?'Guardado solo en este dispositivo':Store.mode==='blocked'?'Sin acceso a los datos compartidos':'Conectando…';
 }
+// Una sola vez: las partidas del Rotativo que quedaron sin entrada o sin comida cargadas
+// (no se guardaba lo que se escribía) pasan a $15.000 de entrada y $25.000 de comida por persona.
+function backfillCuentas(){
+  if(ui.bfDone||!ui.loaded||TID!=='rotativo'||!isAdmin()||!Object.keys(S.games).length)return;ui.bfDone=true;
+  for(const [gid,g] of Object.entries(S.games)){if(g.tid&&g.tid!==TID||!(g.date<='2026-10-08'))continue;
+    const p={};if(!(+g.entry))p.entry=15000;if(!(+g.food)&&!(+g.foodPP)){p.foodPP=25000;p.foodMode='pp'}
+    if(Object.keys(p).length)Store.update('games',gid,p)}
+}
 function render(){
+  setTimeout(backfillCuentas);
   // preserva foco y cursor si alguien escribe mientras llega un cambio
   const a=document.activeElement,keep=a&&a.id&&(a.tagName==='INPUT'||a.tagName==='SELECT')?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null;
   if(soloVie()){if(ui.tab==='stats')ui.tab='inicio';ui.newType='vie'}
@@ -1230,6 +1247,7 @@ function vGame(gid,g){
 const MESA_MAX=11;
 // Cada mesa es una lista donde la posición es el asiento; '' = asiento vacío (alguien se cambió de mesa).
 const tablesOf=g=>[g.tables?.m1||[],g.tables?.m2||[]].filter(t=>t.some(Boolean));
+const isBtn=(g,id)=>!!id&&(g.btn?.m1===id||g.btn?.m2===id);
 const MESA_FINAL=9; // con esta cantidad o menos en juego, se juntan todos en la mesa 1
 // Qué hay que hacer con las mesas según quiénes siguen en juego: equilibrar, juntar o nada.
 function mesaAviso(g,c){
@@ -1268,7 +1286,7 @@ function vMesas(g,c){
   const sel=i=>`<label><span class="label">${two?'Repartidor '+(i+1):'Reparte (opcional)'}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
     ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl[1-i]===id?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
   const armed=ui.armed==='mesas';
-  const list=(t,i)=>{const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
+  const list=(t,i)=>{const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${two?'2 mesas':'1 mesa'}</span></div>
     <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad (si son impares, la mesa 1 lleva uno más). Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar. El número es el asiento: el 1 reparte y del 2 en adelante se sortea.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El número es el asiento: el 1 reparte (si no elegís quién, también se sortea) y del 2 en adelante se sortea.`}</p>
@@ -1367,6 +1385,21 @@ function vTimer(g,ts,big){
     ${ctl}
   </section>`;
 }
+// Pantalla de juego: los que siguen arriba (por mesa si se sortearon) y los eliminados abajo, finitos, con su puesto
+function vPlayersBig(g,c,players,tag){
+  if(!players.length)return '<ul class="pplayers one"><li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li></ul>';
+  const by=Object.fromEntries(players.map(x=>[x.id,x])),m1=g.tables?.m1||[],m2=g.tables?.m2||[],dos=m2.some(Boolean);
+  // en dos mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
+  const tg=!dos?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
+  const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
+    :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${isBtn(g,x.id)?'<span class="dbtn" title="Dealer">D</span>':''}${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
+  const ul=(xs,one)=>{const vivos=xs.filter(x=>!x.p.ko),kos=xs.filter(x=>x.p.ko).sort((a,b)=>a.pl-b.pl);
+    return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
+  if(!dos)return ul(m1.some(Boolean)?[...m1.filter(id=>by[id]).map(id=>by[id]),...players.filter(x=>!m1.includes(x.id))]:players,players.length<=8);
+  const t1=[...m1.filter(id=>by[id]).map(id=>by[id]),...players.filter(x=>!m1.includes(x.id)&&!m2.includes(x.id))],t2=m2.filter(id=>by[id]&&!m1.includes(id)).map(id=>by[id]);
+  const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i} · ${n||'cerrada'}</div>`};
+  return `<div class="pmesas"><div>${head(1,t1)}${ul(t1,true)}</div><div>${head(2,t2)}${ul(t2,true)}</div></div>`;
+}
 function renderBig(){
   const w=$('#bigwrap');
   if(Store.mode==='blocked'){w.innerHTML='';return}
@@ -1392,8 +1425,8 @@ function renderBig(){
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
       <div><div class="plab">Pozo · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
       <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
-      <div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>
-      <ul class="pplayers ${players.length<=8?'one':''}">${players.map(x=>x.p.ko?`<li class="ko">${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span><span class="ptag free">${x.pl}º</span></li>`:`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tag(x)}</li>`).join('')||'<li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li>'}</ul>
+      ${(g.tables?.m2||[]).some(Boolean)?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
+      ${vPlayersBig(g,c,players,tag)}
     </aside>
     <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
     ${ctl}
@@ -1989,7 +2022,9 @@ const ACT={
   },
   st:d=>{
     if(isFB()&&!isAdmin()&&d.pid!==me()){if(!me()){ui.pinFor=d.pid;ui.pinErr=null;render();return}ui.err='Solo podés cambiar tu propia asistencia.';render();return}
-    const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
+    const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;
+    if(d.v==='no'&&(cur==='juega'||cur==='come')&&!g.parts[d.pid].ko&&canKO(g,tstate(g))&&confirm(pname(d.pid)+' está jugando. ¿Quedó afuera del torneo?\n\nAceptar: queda eliminado con su puesto.\nCancelar: lo saco de la lista porque no vino.')){ui.armed='ko-'+d.pid;ACT.ko(d);return}
+    Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
   ko:d=>{
     if(ui.armed!=='ko-'+d.pid){arm('ko-'+d.pid);return}ui.armed=null;
     const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=Date.now();
@@ -2051,7 +2086,10 @@ const ACT={
     const [gid,g]=currentGame();
     if(tablesOf(g).length&&ui.armed!=='mesas'){arm('mesas');return}ui.armed=null;
     const c=calc(g),dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
-    const [m1,m2=[]]=drawTables(c.playing,dl);Store.update('games',gid,{tables:{m1,m2}});
+    const [m1,m2=[]]=drawTables(c.playing,dl);
+    // el botón de dealer (D) también se sortea en cada mesa
+    const pick=t=>t.length?t[rnd(t.length)]:'';
+    Store.update('games',gid,{tables:{m1,m2},btn:{m1:pick(m1),m2:pick(m2)}});
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
@@ -2157,7 +2195,15 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset&&el.dataset.mask==='fecha'){const d=el.value.replace(/\D/g,'').slice(0,8);el.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d;return}
   if(!el.classList||!el.classList.contains('money'))return;el.value=moneyIn(el.value)});
-document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el)CHG[el.dataset.chg](el)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el){clearTimeout(numT);CHG[el.dataset.chg](el)}});
+// Entrada, comida, etc. se guardan solos mientras se escribe (no hace falta salir del campo):
+// si la pantalla se redibuja en el medio (el reloj, otro celular) el "change" del campo nuevo nunca llega.
+let numT=null;
+document.addEventListener('input',e=>{const el=e.target;if(el.dataset?.chg!=='num')return;
+  clearTimeout(numT);numT=setTimeout(()=>{const x=document.getElementById(el.id)||el;CHG.num(x)},700)});
+document.addEventListener('focusout',e=>{const el=e.target;if(el.dataset?.chg!=='num')return;
+  const [,g]=currentGame()||[];if(!g)return;const raw=el.classList.contains('money')?digits(el.value):el.value;
+  if(String(g[el.dataset.k]??'')!==String(raw===''?'':Math.max(0,+raw))){clearTimeout(numT);CHG.num(el)}});
 // Lo que se va escribiendo en un formulario (torneo nuevo, fichas, claves…) se guarda aparte, así no se pierde
 // cuando la pantalla se redibuja porque llegó un cambio de otro celular.
 ui.drafts={};
