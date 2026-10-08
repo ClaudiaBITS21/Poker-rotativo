@@ -990,7 +990,8 @@ function splitPot(pot,split){
 const foodModeOf=g=>g.foodMode||(+g.food?'total':'pp');
 function calc(g){
   const t=T(g.type),parts={...(g.parts||{})};
-  const playing=Object.keys(parts).filter(id=>parts[id].st==='juega'||parts[id].st==='come');
+  // el que ya quedó eliminado siempre cuenta como que jugó, aunque después le hayan cambiado la asistencia
+  const playing=Object.keys(parts).filter(id=>parts[id].st==='juega'||parts[id].st==='come'||parts[id].ko>0);
   // los ganadores cuentan como que jugaron aunque nadie haya cargado su asistencia
   for(const k of ['p1','p2','p3','ceb']){const id=(g.result||{})[k];if(id&&!playing.includes(id)){playing.push(id);parts[id]=parts[id]||{st:'juega'}}}
   const eaters=playing.filter(id=>parts[id].st==='come');
@@ -2023,7 +2024,7 @@ const ACT={
   st:d=>{
     if(isFB()&&!isAdmin()&&d.pid!==me()){if(!me()){ui.pinFor=d.pid;ui.pinErr=null;render();return}ui.err='Solo podés cambiar tu propia asistencia.';render();return}
     const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.st;
-    if(d.v==='no'&&(cur==='juega'||cur==='come')&&!g.parts[d.pid].ko&&canKO(g,tstate(g))&&confirm(pname(d.pid)+' está jugando. ¿Quedó afuera del torneo?\n\nAceptar: queda eliminado con su puesto.\nCancelar: lo saco de la lista porque no vino.')){ui.armed='ko-'+d.pid;ACT.ko(d);return}
+    if((d.v==='no'||cur===d.v)&&(cur==='juega'||cur==='come')&&!g.parts[d.pid].ko&&canKO(g,tstate(g))&&confirm(pname(d.pid)+' está jugando. ¿Quedó afuera del torneo?\n\nAceptar: queda eliminado con su puesto.\nCancelar: lo saco de la lista porque no vino.')){ui.armed='ko-'+d.pid;ACT.ko(d);return}
     Store.update('games',gid,{parts:{[d.pid]:{st:cur===d.v?'':d.v}}})},
   ko:d=>{
     if(ui.armed!=='ko-'+d.pid){arm('ko-'+d.pid);return}ui.armed=null;
