@@ -275,6 +275,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .pmesas .pplayers li:not(.ko){padding:calc(.15*var(--pw)) 0}
 .proj .pmesas .pplayers .av{width:1.4em;height:1.4em}
 .proj .pmesas>div{display:flex;flex-direction:column;gap:calc(.3*var(--pw));min-width:0}
+.seatpop .seatbig{display:flex;gap:20px;justify-content:center;font-size:22px;padding:6px 0}
+.seatpop .seatbig b{font-size:52px;color:var(--red);margin-left:6px;line-height:1}
 .dbtn{display:inline-grid;place-items:center;width:1.45em;height:1.45em;flex:none;border-radius:50%;background:#fff;color:#111;border:1px solid #999;font-family:var(--num);font-weight:700;font-size:.8em;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 .edit{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;width:100%}
 @media (max-width:520px){.edit{grid-template-columns:1fr}}
@@ -1396,7 +1398,7 @@ function vPlayersBig(g,c,players,tag){
   // en dos mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
   const tg=!dos?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
   const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
-    :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${isBtn(g,x.id)?'<span class="dbtn" title="Dealer">D</span>':''}${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
+    :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
   const ul=(xs,one)=>{const vivos=xs.filter(x=>!x.p.ko),kos=xs.filter(x=>x.p.ko).sort((a,b)=>a.pl-b.pl);
     return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
   if(!dos)return ul(m1.some(Boolean)?[...m1.filter(id=>by[id]).map(id=>by[id]),...players.filter(x=>!m1.includes(x.id))]:players,players.length<=8);
@@ -1462,10 +1464,33 @@ function renderPin(w){
   </section></div>`;
   const f=document.getElementById('pin1');if(f&&!ui.pinBusy)f.focus();
 }
+// Cuando se sortean las mesas, a cada uno le aparece una vez su mesa y asiento (hasta que toque OK).
+// Si después lo cambian de mesa o se vuelve a sortear, le aparece de nuevo con el lugar nuevo.
+function miLugar(){
+  const m=me();if(!m)return null;
+  for(const [gid,g] of openGames()){if(g.date<ayer()||g.parts?.[m]?.ko)continue;
+    for(const [k,i] of [['m1',1],['m2',2]]){const t=g.tables?.[k]||[],s=t.indexOf(m);
+      if(s>=0)return {gid,g,mesa:i,seat:s+1,t,dos:(g.tables?.m2||[]).some(Boolean),key:gid+':'+i+':'+(s+1)}}}
+  return null;
+}
+function renderSeat(w){
+  const L=miLugar();if(!L)return false;
+  let seen='';try{seen=localStorage.getItem('poker.seat.'+L.gid)||''}catch{}
+  if(seen===L.key||ui.seatOk===L.key)return false;
+  const otros=L.t.map((id,i)=>id&&id!==me()&&!L.g.parts?.[id]?.ko?`<li><b class="seat num">${i+1}</b>${avatar(id,22)}<span class="nm">${esc(pname(id))}</span>${isBtn(L.g,id)?'<span class="dbtn" title="Dealer">D</span>':''}</li>`:'').join('');
+  w.innerHTML=`<div class="modal"><section class="card seatpop" data-suit="♠" role="dialog" aria-modal="true" aria-label="Tu lugar en la mesa">
+    <h2>Tu lugar</h2>
+    <div class="seatbig">${L.dos?`<span>Mesa <b class="num">${L.mesa}</b></span>`:''}<span>Asiento <b class="num">${L.seat}</b></span></div>
+    ${L.seat===1?'<p style="margin:0">Te toca <b>repartir</b>.</p>':''}${isBtn(L.g,me())?'<p style="margin:0">Arrancás con el botón de dealer <span class="dbtn">D</span>.</p>':''}
+    ${otros?`<div class="label">En tu mesa</div><div class="mesa" style="border:0;padding:0"><ol>${otros}</ol></div>`:''}
+    <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="seatOk" data-v="${L.key}" data-gid="${L.gid}">OK</button></div>
+  </section></div>`;
+  return true;
+}
 function renderModal(){
   const w=$('#modal');
   if(ui.pinFor&&S.players[ui.pinFor]){renderPin(w);return}
-  if(!ui.avFor&&ui.loaded&&!(isFB()&&ui.gate!=='ok')&&renderGift(w))return;
+  if(!ui.avFor&&ui.loaded&&!(isFB()&&ui.gate!=='ok')&&(renderSeat(w)||renderGift(w)))return;
   const pid=ui.avFor;
   if(!pid||!S.players[pid]){w.innerHTML='';return}
   const d=ui.avDraft,tab=ui.avTab;
@@ -2101,6 +2126,7 @@ const ACT={
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   addPToggle:()=>{ui.addingP=!ui.addingP;render();if(ui.addingP)setTimeout(()=>{const i=$('#npg-name');i&&i.focus()})},
   heroToggle:()=>{ui.heroOpen=!ui.heroOpen;try{localStorage.setItem('poker.hero',ui.heroOpen?'1':'0')}catch{}render()},
+  seatOk:d=>{ui.seatOk=d.v;try{localStorage.setItem('poker.seat.'+d.gid,d.v)}catch{}render()},
   admAdd:()=>{const pid=(document.getElementById('adm-add')||{}).value;if(!pid)return;const pids=[...new Set([...(ui.adminPids||[]),pid])];
     FB.m.setDoc(FB.m.doc(FB.db,'config','admins'),{pids},{merge:true}).catch(fail)},
   admDel:d=>{if(!confirm('¿Quitarle los permisos de administrador a '+((ui.allPlayers||{})[d.pid]?.name||'este jugador')+'?'))return;
