@@ -271,6 +271,15 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .pplayers li.ko b{min-width:2.2em;text-align:right;font-weight:500}
 .proj .pplayers li.ko .nm{font-weight:500}
 .proj .pplayers li:not(.ko)+li.ko{margin-top:calc(.5*var(--pw))}
+.proj.tres{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
+.proj.tres .clock{font-size:clamp(64px,min(calc(14*var(--pw)),calc(30*var(--ph))),300px)}
+.proj .pmesas.tres{gap:calc(1*var(--pw))}
+.proj .pmesas.tres .ptag{display:none}
+.proj .pmesas.tres .pplayers .av{display:none}
+.proj .pmesas.tres .pplayers{font-size:clamp(11px,min(calc(1.2*var(--pw)),calc(2.2*var(--ph))),22px)}
+.proj .pmesas.tres .pplayers li:not(.ko){padding:calc(.12*var(--ph)) 0}
+.proj.tres .pprz{flex-direction:row;flex-wrap:wrap;gap:calc(.3*var(--pw)) calc(1.4*var(--pw));font-size:clamp(14px,calc(1.5*var(--pw)),28px)}
+.proj.tres .pprz div{border:0;padding:0;gap:.5em}
 .proj .pmesas{display:grid;grid-template-columns:1fr 1fr;gap:calc(1.6*var(--pw));min-height:0;overflow:hidden}
 .proj .pmesas .pplayers li:not(.ko){padding:calc(.15*var(--pw)) 0}
 .proj .pmesas .pplayers .av{width:1.4em;height:1.4em}
@@ -1253,60 +1262,68 @@ function vGame(gid,g){
   `;
 }
 
-// Mesas: hasta MESA_MAX jugadores, una mesa; con más, dos mesas mitad y mitad.
-// Se eligen antes los dos que reparten; el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar.
-const MESA_MAX=11;
+// Mesas: la Mesa 1 es la grande (hasta 11) y las otras dos de hasta 9. Se agrega una mesa cuando ya no entran:
+// hasta 11 jugadores una mesa, hasta 20 dos, hasta 29 tres. Se reparte parejo entre las mesas (sin pasar la capacidad).
+// Si se eligen repartidores, el sorteo manda a cada uno a una mesa distinta (asiento 1); el resto se sortea.
+const MESA_CAP=[11,9,9],MESA_MAX=MESA_CAP[0],MKEYS=['m1','m2','m3'];
+const nMesas=n=>n<=MESA_CAP[0]?1:n<=MESA_CAP[0]+MESA_CAP[1]?2:3;
 // Cada mesa es una lista donde la posición es el asiento; '' = asiento vacío (alguien se cambió de mesa).
-const tablesOf=g=>[g.tables?.m1||[],g.tables?.m2||[]].filter(t=>t.some(Boolean));
-const isBtn=(g,id)=>!!id&&(g.btn?.m1===id||g.btn?.m2===id);
-const MESA_FINAL=9; // con esta cantidad o menos en juego, se juntan todos en la mesa 1
-// Qué hay que hacer con las mesas según quiénes siguen en juego: equilibrar, juntar o nada.
+const mesasAll=g=>MKEYS.map(k=>(g.tables?.[k]||[]).slice());
+const tablesOf=g=>mesasAll(g).filter(t=>t.some(Boolean));
+const isBtn=(g,id)=>!!id&&MKEYS.some(k=>g.btn?.[k]===id);
+const MESA_FINAL=9; // se rompe una mesa cuando los que siguen entran en una mesa menos (de a 9 por mesa)
+// Qué hay que hacer con las mesas según quiénes siguen en juego: equilibrar, juntar (romper una mesa) o nada.
 function mesaAviso(g,c){
   if(g.status==='closed')return null;
-  const m1=g.tables?.m1||[],m2=g.tables?.m2||[];
-  const vivos=t=>t.filter(id=>id&&c.alive.includes(id));
-  const a1=vivos(m1),a2=vivos(m2);
-  if(!a1.length||!a2.length)return null;
-  if(a1.length+a2.length<=MESA_FINAL)return {tipo:'juntar',n:a1.length+a2.length};
-  if(Math.abs(a1.length-a2.length)>=2)return a1.length>a2.length?{tipo:'pasar',de:1,a:2,n1:a1.length,n2:a2.length}:{tipo:'pasar',de:2,a:1,n1:a1.length,n2:a2.length};
+  const vivos=mesasAll(g).map((t,i)=>({i,n:t.filter(id=>id&&c.alive.includes(id)).length})).filter(x=>x.n);
+  if(vivos.length<2)return null;
+  const tot=vivos.reduce((a,x)=>a+x.n,0);
+  if(tot<=MESA_FINAL*(vivos.length-1)){const r=vivos.filter(x=>x.i>0).sort((a,b)=>a.n-b.n||b.i-a.i)[0]; /* la Mesa 1 (la grande) nunca se rompe */ return {tipo:'juntar',n:tot,rompe:r.i+1,final:vivos.length===2}}
+  const mx=vivos.slice().sort((a,b)=>b.n-a.n||a.i-b.i)[0],mn=vivos.slice().sort((a,b)=>a.n-b.n||a.i-b.i)[0];
+  if(mx.n-mn.n>=2)return {tipo:'pasar',de:mx.i+1,a:mn.i+1,cuentas:vivos.map(x=>`Mesa ${x.i+1} tiene ${x.n}`).join(', ')};
   return null;
 }
 function vAviso(g,c){
   const av=mesaAviso(g,c),msg=ui.moveMsg&&ui.moveMsg.g===g.createdAt?`<div class="donemsg">${esc(ui.moveMsg.t)}</div>`:'';
   if(!av)return msg;
-  if(av.tipo==='juntar')return msg+`<div class="aviso"><b>Mesa final:</b> quedan ${av.n} en juego. Se juntan todos en la Mesa 1.<button class="btn gold" data-act="mesaJuntar">Juntar en la Mesa 1</button></div>`;
-  return msg+`<div class="aviso"><b>Equilibrar mesas:</b> Mesa 1 tiene ${av.n1} y Mesa 2 tiene ${av.n2}. Pasa un jugador de la Mesa ${av.de} a la Mesa ${av.a}.<button class="btn gold" data-act="mesaPasar">Sortear quién pasa</button></div>`;
+  if(av.tipo==='juntar')return msg+(av.final
+    ?`<div class="aviso"><b>Mesa final:</b> quedan ${av.n} en juego. Se juntan todos en una mesa.<button class="btn gold" data-act="mesaJuntar">Juntar en una mesa</button></div>`
+    :`<div class="aviso"><b>Romper una mesa:</b> quedan ${av.n} en juego y entran en una mesa menos. Los de la Mesa ${av.rompe} se reparten en las otras.<button class="btn gold" data-act="mesaJuntar">Romper la Mesa ${av.rompe}</button></div>`);
+  return msg+`<div class="aviso"><b>Equilibrar mesas:</b> ${av.cuentas}. Pasa un jugador de la Mesa ${av.de} a la Mesa ${av.a}.<button class="btn gold" data-act="mesaPasar">Sortear quién pasa</button></div>`;
 }
 function rnd(n){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n}
 function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+// tamaños parejos para k mesas sin pasar la capacidad de cada una (lo que sobra va primero a la Mesa 1)
+function mesaSizes(n,k){
+  const sz=Array.from({length:k},(_,i)=>Math.floor(n/k)+(i<n%k?1:0));
+  for(let i=0;i<k;i++)while(sz[i]>MESA_CAP[i]){const j=sz.findIndex((x,m)=>x<MESA_CAP[m]);if(j<0)break;sz[i]--;sz[j]++}
+  return sz;
+}
 // El orden de cada lista es el asiento: el 1 reparte y del 2 en adelante se sortea.
 function drawTables(playing,dealers){
-  if(playing.length<=MESA_MAX){const d=dealers[0];return [d?[d,...shuffle(playing.filter(id=>id!==d))]:shuffle(playing)]}
-  const [d1,d2]=shuffle(dealers),rest=shuffle(playing.filter(id=>!dealers.includes(id)));
-  const sizeA=Math.ceil(playing.length/2); // si son impares, la mesa 1 lleva uno más
-  const a=[d1,...rest.slice(0,sizeA-1)],b=[d2,...rest.slice(sizeA-1)];
-  return [a,b];
+  const k=nMesas(playing.length),sz=mesaSizes(playing.length,k);
+  const dl=shuffle([...new Set(dealers.filter(id=>id&&playing.includes(id)))].slice(0,k));
+  let rest=shuffle(playing.filter(id=>!dl.includes(id)));
+  return sz.map((n,i)=>{const t=dl[i]?[dl[i]]:[];while(t.length<n&&rest.length)t.push(rest.shift());return t});
 }
 function vMesas(g,c){
   const n=c.playing.length;if(n<2)return '';
-  const two=n>MESA_MAX,closed=g.status==='closed',dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
-  const tables=tablesOf(g);
+  const k=nMesas(n),closed=g.status==='closed',dl=(g.dealers||[]).slice(0,k).map(id=>c.playing.includes(id)?id:'');
+  const all=mesasAll(g),tables=tablesOf(g);
   const seated=new Set(tables.flat().filter(Boolean)),missing=c.alive.filter(id=>!seated.has(id));
   const stale=tables.length&&missing.length;
-  const ready=!two||(dl.length===2&&dl[0]!==dl[1]);
-  const sel=i=>`<label><span class="label">${two?'Repartidor '+(i+1):'Reparte (opcional)'}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
-    ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl[1-i]===id?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
-  const armed=ui.armed==='mesas';
-  const list=(t,i)=>{const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
+  const sel=i=>`<label><span class="label">${k>1?'Reparte en la Mesa '+(i+1)+' (opcional)':'Reparte (opcional)'}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
+    ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl.some((x,j)=>j!==i&&x===id)?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
+  const armed=ui.armed==='mesas',sz=mesaSizes(n,k);
+  const list=(t,i)=>{if(!t.some(Boolean))return '';const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
   return `<section class="card" data-suit="♠">
-    <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${two?'2 mesas':'1 mesa'}</span></div>
-    <p class="small muted" style="margin:0">${two?`Con más de ${MESA_MAX} se juega en dos mesas, mitad y mitad (si son impares, la mesa 1 lleva uno más). Elegí quiénes reparten: el sorteo manda a cada uno a una mesa distinta y reparte al resto al azar. El número es el asiento: el 1 reparte y del 2 en adelante se sortea.`:`Hasta ${MESA_MAX} jugadores se juega en una sola mesa. El número es el asiento: el 1 reparte (si no elegís quién, también se sortea) y del 2 en adelante se sortea.`}</p>
-    <div class="fields">${two?sel(0)+sel(1):sel(0)}</div>
-    ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas" ${ready?'':'disabled'}>${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button>
-      ${ready?'':'<span class="small muted">Elegí a los dos que reparten para sortear.</span>'}</div>`}
+    <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${k===1?'1 mesa':k+' mesas'}</span></div>
+    <p class="small muted" style="margin:0">La Mesa 1 es para ${MESA_CAP[0]} y las otras para ${MESA_CAP[1]}: se agrega una mesa cuando ya no entran. ${k>1?`Hoy son ${k} mesas de ${sz.join(', ')}.`:''} El número es el asiento: el 1 reparte (si no elegís quién, se sortea) y del 2 en adelante se sortea.</p>
+    <div class="fields">${Array.from({length:k},(_,i)=>sel(i)).join('')}</div>
+    ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas">${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button></div>`}
     ${vAviso(g,c)}
     ${stale?`<div class="err">Cambió la asistencia desde el sorteo${missing.length?': '+missing.map(pname).map(esc).join(', ')+' sin mesa':''}. Volvé a sortear.</div>`:''}
-    ${tables.length?`<div class="mesas">${tables.map(list).join('')}</div>`:''}
+    ${tables.length?`<div class="mesas">${all.map(list).join('')}</div>`:''}
   </section>`;
 }
 function vKO(g,c,ts){
@@ -1399,17 +1416,19 @@ function vTimer(g,ts,big){
 // Pantalla de juego: los que siguen arriba (por mesa si se sortearon) y los eliminados abajo, finitos, con su puesto
 function vPlayersBig(g,c,players,tag){
   if(!players.length)return '<ul class="pplayers one"><li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li></ul>';
-  const by=Object.fromEntries(players.map(x=>[x.id,x])),m1=g.tables?.m1||[],m2=g.tables?.m2||[],dos=m2.some(Boolean);
-  // en dos mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
+  const by=Object.fromEntries(players.map(x=>[x.id,x])),M=mesasAll(g),usadas=M.map((t,i)=>i).filter(i=>M[i].some(Boolean)),dos=usadas.length>1;
+  // con varias mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
   const tg=!dos?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
   const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
     :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
   const ul=(xs,one)=>{const vivos=xs.filter(x=>!x.p.ko),kos=xs.filter(x=>x.p.ko).sort((a,b)=>a.pl-b.pl);
     return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
-  if(!dos)return ul(m1.some(Boolean)?[...m1.filter(id=>by[id]).map(id=>by[id]),...players.filter(x=>!m1.includes(x.id))]:players,players.length<=8);
-  const t1=[...m1.filter(id=>by[id]).map(id=>by[id]),...players.filter(x=>!m1.includes(x.id)&&!m2.includes(x.id))],t2=m2.filter(id=>by[id]&&!m1.includes(id)).map(id=>by[id]);
-  const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i} · ${n||'cerrada'}</div>`};
-  return `<div class="pmesas"><div>${head(1,t1)}${ul(t1,true)}</div><div>${head(2,t2)}${ul(t2,true)}</div></div>`;
+  const sentado=new Set(),cols=usadas.map(i=>M[i].filter(id=>by[id]&&!sentado.has(id)&&sentado.add(id)).map(id=>by[id]));
+  const sueltos=players.filter(x=>!sentado.has(x.id));
+  if(!dos)return ul(cols.length?[...cols[0],...sueltos]:players,players.length<=8);
+  cols[0].push(...sueltos);
+  const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i+1} · ${n||'cerrada'}</div>`};
+  return `<div class="pmesas ${cols.length>2?'tres':''}" style="grid-template-columns:repeat(${cols.length},minmax(0,1fr))">${cols.map((xs,j)=>`<div>${head(usadas[j],xs)}${ul(xs,true)}</div>`).join('')}</div>`;
 }
 function renderBig(){
   const w=$('#bigwrap');
@@ -1423,7 +1442,7 @@ function renderBig(){
   const tag=x=>vie
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
-  w.innerHTML=`<div class="proj ${ts.done?'isdone':''}" role="dialog" aria-label="Pantalla de juego">
+  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
       <div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min</span></div>
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
@@ -1436,7 +1455,7 @@ function renderBig(){
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
       <div><div class="plab">Pozo · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
       <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
-      ${(g.tables?.m2||[]).some(Boolean)?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
+      ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
     </aside>
     <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
@@ -1474,8 +1493,8 @@ function renderPin(w){
 function miLugar(){
   const m=me();if(!m)return null;
   for(const [gid,g] of openGames()){if(g.date<ayer()||g.parts?.[m]?.ko)continue;
-    for(const [k,i] of [['m1',1],['m2',2]]){const t=g.tables?.[k]||[],s=t.indexOf(m);
-      if(s>=0)return {gid,g,mesa:i,seat:s+1,t,dos:(g.tables?.m2||[]).some(Boolean),key:gid+':'+i+':'+(s+1)}}}
+    for(const [i,k] of MKEYS.entries()){const t=g.tables?.[k]||[],s=t.indexOf(m);
+      if(s>=0)return {gid,g,mesa:i+1,seat:s+1,t,dos:tablesOf(g).length>1,key:gid+':'+(i+1)+':'+(s+1)}}}
   return null;
 }
 function renderSeat(w){
@@ -2101,7 +2120,7 @@ const ACT={
   foodMode:d=>{const [gid]=currentGame();Store.update('games',gid,{foodMode:d.v})},
   mesaPasar:()=>{
     const [gid,g]=currentGame(),c=calc(g),av=mesaAviso(g,c);if(!av||av.tipo!=='pasar')return;
-    const T={1:(g.tables.m1||[]).slice(),2:(g.tables.m2||[]).slice()},de=T[av.de],a=T[av.a];
+    const M=mesasAll(g),de=M[av.de-1],a=M[av.a-1];
     // pasa alguien en juego de la mesa más llena (nunca el que reparte, asiento 1) a un asiento libre de la otra
     let cand=de.map((id,i)=>i).filter(i=>i>0&&de[i]&&c.alive.includes(de[i]));if(!cand.length)cand=de.map((id,i)=>i).filter(i=>de[i]&&c.alive.includes(de[i]));
     const si=cand[rnd(cand.length)],pid=de[si];
@@ -2109,26 +2128,28 @@ const ACT={
     const ti=libres.length?libres[rnd(libres.length)]:a.length;
     de[si]='';a[ti]=pid;
     ui.moveMsg={g:g.createdAt,t:`${pname(pid)} pasa de la Mesa ${av.de} a la Mesa ${av.a}, asiento ${ti+1}.`};
-    Store.update('games',gid,{tables:{m1:T[1],m2:T[2]}});
+    Store.update('games',gid,{tables:Object.fromEntries(MKEYS.map((k,i)=>[k,M[i]]))});
   },
+  // rompe una mesa: sus jugadores van, al azar, a asientos libres de las otras (siempre a la que tenga menos)
   mesaJuntar:()=>{
-    const [gid,g]=currentGame(),c=calc(g);
-    const m1=(g.tables.m1||[]).slice(),m2=(g.tables.m2||[]).slice();
-    const vienen=shuffle(m2.filter(id=>id&&c.alive.includes(id)));
-    const libres=shuffle(m1.map((id,i)=>i).filter(i=>i>0&&(!m1[i]||!c.alive.includes(m1[i]))));
-    const lugares=[];
-    for(const pid of vienen){const ti=libres.length?libres.shift():m1.length;m1[ti]=pid;m2[m2.indexOf(pid)]='';lugares.push(`${pname(pid)} al ${ti+1}`)}
-    ui.moveMsg={g:g.createdAt,t:`Mesa final en la Mesa 1. Asientos nuevos: ${lugares.join(', ')}.`};
-    Store.update('games',gid,{tables:{m1,m2}});
+    const [gid,g]=currentGame(),c=calc(g),av=mesaAviso(g,c);if(!av||av.tipo!=='juntar')return;
+    const M=mesasAll(g),r=av.rompe-1,viv=t=>t.filter(id=>id&&c.alive.includes(id)).length;
+    const vienen=shuffle(M[r].filter(id=>id&&c.alive.includes(id))),lugares=[];
+    for(const pid of vienen){
+      const dest=M.map((t,i)=>i).filter(i=>i!==r&&viv(M[i])).sort((x,y)=>viv(M[x])-viv(M[y])||x-y)[0];const t=M[dest];
+      const libres=t.map((id,i)=>i).filter(i=>i>0&&(!t[i]||!c.alive.includes(t[i])));
+      const ti=libres.length?libres[rnd(libres.length)]:t.length;t[ti]=pid;M[r][M[r].indexOf(pid)]='';
+      lugares.push(`${pname(pid)} a la Mesa ${dest+1}, asiento ${ti+1}`)}
+    ui.moveMsg={g:g.createdAt,t:`${av.final?'Mesa final.':'Se rompió la Mesa '+av.rompe+'.'} ${lugares.join('; ')}.`};
+    Store.update('games',gid,{tables:Object.fromEntries(MKEYS.map((k,i)=>[k,M[i]]))});
   },
   mesas:()=>{
     const [gid,g]=currentGame();
     if(tablesOf(g).length&&ui.armed!=='mesas'){arm('mesas');return}ui.armed=null;
-    const c=calc(g),dl=(g.dealers||[]).filter(id=>c.playing.includes(id));
-    const [m1,m2=[]]=drawTables(c.playing,dl);
+    const c=calc(g),M=drawTables(c.playing,g.dealers||[]);
     // el botón de dealer (D) también se sortea en cada mesa
-    const pick=t=>t.length?t[rnd(t.length)]:'';
-    Store.update('games',gid,{tables:{m1,m2},btn:{m1:pick(m1),m2:pick(m2)}});
+    const pick=t=>t&&t.length?t[rnd(t.length)]:'';
+    Store.update('games',gid,{tables:Object.fromEntries(MKEYS.map((k,i)=>[k,M[i]||[]])),btn:Object.fromEntries(MKEYS.map((k,i)=>[k,pick(M[i])]))});
   },
   statsType:d=>{ui.statsType=d.v;render()},
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
@@ -2215,7 +2236,7 @@ const CHG={
   regIn:el=>{rpSave(el.dataset.rid,el.dataset.pid,{in:el.checked})},
   gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid,g]=currentGame();if(canFinish(g))return;if(el.value)Store.update('games',gid,{date:el.value})},
-  dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,2);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[d[0]||'',d[1]||'']})},
+  dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,3);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[0,1,2].map(i=>d[i]||'')})},
   pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value},resultManual:true})},
   me:el=>{if(isFB()){ui.pinFor=el.value||null;ui.pinErr=null;render();return}ui.me=el.value||null;try{ui.me?localStorage.setItem('poker.me',ui.me):localStorage.removeItem('poker.me')}catch{}render()},
   photo:async el=>{
