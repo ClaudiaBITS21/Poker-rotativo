@@ -1068,8 +1068,8 @@ function ladder(g,ts){
     return h;
   }).join('');
 }
-function stats(type,noPrev){
-  const games=Object.values(S.games).filter(g=>g.status==='closed'&&(type==='all'||g.type===type));
+function stats(type,noPrev,skip){
+  const games=Object.entries(S.games).filter(([id,g])=>id!==skip&&g.status==='closed'&&(type==='all'||g.type===type)).map(([,g])=>g);
   const out={};
   for(const [id,p] of Object.entries(S.players)) out[id]={id,name:p.name,since:p.since||'',active:p.active!==false,ceb:0,pj:0,eligible:0,p1:0,p2:0,p3:0,pts:0,rb:0,won:0,ate:0};
   for(const g of games){
@@ -1580,6 +1580,68 @@ function vJugadores(){
   </section>`;
 }
 
+const CAM_SVG='<svg viewBox="0 0 32 26" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M4 6h6l2.5-3.5h7L22 6h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><circle cx="16" cy="15" r="6.2"/><circle cx="16" cy="15" r="3.8"/><rect x="5.2" y="9.2" width="2.8" height="2" rx="1" fill="currentColor" stroke="none"/></svg>';
+// Imagen de la tabla para compartir: quién ganó la última partida y cómo queda la tabla (con lo que sumó cada uno esa noche)
+async function tablaPng(){
+  const type=ui.statsType||'all',st=stats(type);
+  const last=Object.entries(S.games).filter(([,g])=>g.status==='closed'&&(type==='all'||g.type===type)&&(g.result||{}).p1)
+    .sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].closedAt||0)-(a[1].closedAt||0))[0];
+  const prev=last?stats(type,false,last[0]):null,prevPos={},prevPts={};
+  if(prev)prev.rows.forEach((r,i)=>{prevPos[r.id]=i+1;prevPts[r.id]=r.pts});
+  const rows=st.rows.filter(r=>r.pj||r.pts);
+  const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
+  const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
+  await Promise.all(['800 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
+  const W=1080,P=56,RH=58,head=250,win=last?250:0,H=head+win+70+rows.length*RH+90;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
+  // paño
+  const gr=x.createRadialGradient(W*.4,H*.3,50,W*.5,H*.4,H);gr.addColorStop(0,V('--felt-3'));gr.addColorStop(.5,V('--felt'));gr.addColorStop(1,'#3D0B08');
+  x.fillStyle=gr;x.fillRect(0,0,W,H);x.strokeStyle='rgba(222,173,110,.45)';x.lineWidth=3;x.strokeRect(22,22,W-44,H-44);
+  const rr=(X,Y,w,h,r)=>{x.beginPath();x.roundRect(X,Y,w,h,r)};
+  // título
+  x.textBaseline='alphabetic';x.textAlign='center';
+  x.fillStyle=V('--gold');x.font=`600 26px ${NUM}`;x.fillText(('Torneo '+tourName()).toUpperCase().split('').join(String.fromCharCode(8202)),W/2,110);
+  x.fillStyle='#FFF6EC';x.font=`800 64px ${SER}`;x.fillText('Tabla de posiciones',W/2,185);
+  x.fillStyle='#F2CFC5';x.font=`400 26px ${BOD}`;x.fillText((type==='all'?'Todas las partidas':T(type).name)+' · '+st.games+' partidas jugadas',W/2,228);
+  let y=head;
+  // ganador de la última partida
+  if(last){const [,g]=last,res=g.result,c=calc(g);
+    rr(P,y,W-2*P,win-30,22);x.fillStyle=V('--paper');x.fill();x.strokeStyle=V('--gold');x.lineWidth=4;x.stroke();
+    x.fillStyle=V('--gold-2');x.font=`600 24px ${NUM}`;x.fillText(('Ganó el '+new Date(g.date+'T12:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})+(typeKeys().length>1?' · '+T(g.type).name:'')).toUpperCase(),W/2,y+52);
+    x.fillStyle=V('--ink');x.font=`800 66px ${SER}`;x.fillText('🏆 '+pname(res.p1),W/2,y+128);
+    const otros=['p2','p3'].map((k,i)=>res[k]?`${i+2}º ${pname(res[k])}`:'').filter(Boolean).join('   ·   ');
+    x.fillStyle=V('--muted');x.font=`600 26px ${BOD}`;x.fillText([otros,c.pot?'Pozo '+money(c.pot):''].filter(Boolean).join('   ·   '),W/2,y+180);
+    y+=win;}
+  // tabla
+  const cx={pos:P+44,name:P+96,mov:W-P-300,sum:W-P-200,pts:W-P-100,pj:W-P-24};
+  rr(P,y,W-2*P,70+rows.length*RH+20,22);x.fillStyle=V('--paper');x.fill();
+  x.fillStyle=V('--muted');x.font=`500 22px ${NUM}`;x.textAlign='center';x.fillText('#',cx.pos,y+46);x.textAlign='left';x.fillText('JUGADOR',cx.name,y+46);
+  x.textAlign='right';if(last){const [,mm,dd]=last[1].date.split('-');x.fillText('EL '+(+dd)+'/'+(+mm),cx.sum,y+46)}x.fillText('PTS',cx.pts,y+46);x.fillText('PJ',cx.pj,y+46);
+  y+=70;
+  rows.forEach((r,i)=>{const ty=y+i*RH,gan=last&&r.id===last[1].result.p1;
+    if(gan){rr(P+10,ty+4,W-2*P-20,RH-8,12);x.fillStyle=V('--gold-soft');x.fill()}
+    else if(i){x.fillStyle=V('--line');x.fillRect(P+24,ty,W-2*P-48,1)}
+    const b=ty+RH/2+11;
+    x.fillStyle=i<3?V('--gold-2'):V('--muted');x.font=`600 30px ${NUM}`;x.textAlign='center';x.fillText(i+1,cx.pos,b);
+    x.fillStyle=V('--ink');x.font=`${gan?700:600} 30px ${BOD}`;x.textAlign='left';
+    let nm=r.name;while(x.measureText(nm).width>cx.mov-cx.name-60&&nm.length>3)nm=nm.slice(0,-2)+'…';x.fillText(nm,cx.name,b);
+    if(last){const pp=prevPos[r.id],d=pp?pp-(i+1):0,s=r.pts-(prevPts[r.id]||0);
+      if(d){x.fillStyle=d>0?'#1F7A45':V('--felt');x.font=`600 22px ${NUM}`;x.textAlign='right';x.fillText((d>0?'▲ ':'▼ ')+Math.abs(d),cx.mov,b-2)}
+      if(s){x.fillStyle=V('--gold-2');x.font=`600 26px ${NUM}`;x.textAlign='right';x.fillText('+'+s,cx.sum,b)}}
+    x.fillStyle=V('--ink');x.font=`600 32px ${NUM}`;x.textAlign='right';x.fillText(r.pts,cx.pts,b);
+    x.fillStyle=V('--muted');x.font=`500 26px ${NUM}`;x.fillText(r.pj,cx.pj,b);
+  });
+  x.textAlign='center';x.fillStyle='rgba(255,246,236,.7)';x.font=`400 22px ${BOD}`;x.fillText(location.host||'poker',W/2,H-42);
+  return new Promise(res=>cv.toBlob(res,'image/png'));
+}
+// copia la imagen; si el navegador no deja, la comparte o la descarga
+async function shareImg(p,name,flag){
+  const done=()=>{ui[flag]=true;render();setTimeout(()=>{ui[flag]=false;render()},1800)};
+  try{await navigator.clipboard.write([new ClipboardItem({'image/png':p})]);done();return}catch{}
+  try{const f=new File([await p],name,{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Torneo '+tourName()});done();return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=name;a.click();done()}catch{}
+}
 function vStats(){
   // "Por partido jugado": rendimiento sobre las veces que cada uno fue (sin la liga anterior, que no tiene partidas)
   const per=ui.statsMode==='pj',st=stats(ui.statsType,per);
@@ -1614,7 +1676,7 @@ function vStats(){
   }
   const m=me();
   return `<section class="card" data-suit="♣">
-    <h2>Tabla</h2>
+    <div class="row spread"><h2>Tabla</h2>${st.games?`<button class="btn mini" data-act="snapTabla" title="Copiar una imagen de la tabla para compartir">${ui.snapTab?'Copiada ✓':CAM_SVG+' Imagen'}</button>`:''}</div>
     <div class="gamepick">${tabs}</div>
     <div class="gamepick">${modes}</div>
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
@@ -1926,7 +1988,7 @@ function vPortada(plegable){
     </svg>
     <div class="htx"><small>Torneo</small><b>${esc(tourName())}</b><span>${cap?'':(soloVie()?esc(T('vie').name):esc(tourSub()))}</span></div>
     ${plegable?'<button class="herohide" data-act="heroToggle" aria-expanded="true">Ocultar ▴</button>':''}
-    <button class="snap" data-act="snapMesa" title="Copiar una imagen de la mesa para compartir" aria-label="Copiar imagen de la mesa">${ui.snapOk?'✓':'<svg viewBox="0 0 32 26" width="20" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M4 6h6l2.5-3.5h7L22 6h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><circle cx="16" cy="15" r="6.2"/><circle cx="16" cy="15" r="3.8"/><rect x="5.2" y="9.2" width="2.8" height="2" rx="1" fill="currentColor" stroke="none"/></svg>'}</button>
+    <button class="snap" data-act="snapMesa" title="Copiar una imagen de la mesa para compartir" aria-label="Copiar imagen de la mesa">${ui.snapOk?'✓':CAM_SVG}</button>
   </section>`;
 }
 function vInicio(){
@@ -2175,13 +2237,8 @@ const ACT={
     const each=Math.ceil(r.monto/inn.length/1000)*1000;inn.forEach(k=>rpSave(d.rid,k,{amt:each,alias:mpAlias()}))},
   giftPay:d=>{rpSave(d.rid,me(),{pay:d.v,payAt:Date.now()})},
   giftPayLater:d=>{d.rid.split(',').forEach(r=>snooze('pay.'+r));render()},
-  snapMesa:async()=>{
-    const p=mesaPng(),done=()=>{ui.snapOk=true;render();setTimeout(()=>{ui.snapOk=false;render()},1800)};
-    try{await navigator.clipboard.write([new ClipboardItem({'image/png':p})]);done();return}catch{}
-    try{const f=new File([await p],'mesa-poker.png',{type:'image/png'});
-      if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Torneo '+tourName()});done();return}
-      const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download='mesa-poker.png';a.click();done()}catch{}
-  },
+  snapMesa:()=>shareImg(mesaPng(),'mesa-poker.png','snapOk'),
+  snapTabla:()=>shareImg(tablaPng(),'tabla-poker.png','snapTab'),
   copyAlias:d=>{const ok=()=>{ui.copied=d.v;render();setTimeout(()=>{ui.copied=null;render()},2000)};try{navigator.clipboard.writeText(d.v).then(ok,()=>prompt('Copiá el alias:',d.v))}catch{prompt('Copiá el alias:',d.v)}},
   giftYes:d=>{rpSave(d.rid,me(),{in:true,resp:true,at:Date.now()})},
   giftNo:d=>{rpSave(d.rid,me(),{in:false,resp:true,at:Date.now()})},
