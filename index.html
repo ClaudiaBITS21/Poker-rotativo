@@ -2057,6 +2057,21 @@ function tick(fromRender){
   if(ts.running&&!wake&&navigator.wakeLock&&document.visibilityState==='visible'){navigator.wakeLock.request('screen').then(w=>{wake=w;w.addEventListener('release',()=>wake=null)}).catch(()=>{})}
 }
 setInterval(()=>tick(false),250);
+// Sincronía entre celulares: los cambios llegan solos (Firebase los empuja), pero un celular que se bloqueó o quedó
+// en segundo plano puede perder la conexión sin darse cuenta y quedarse mostrando una etapa vieja.
+// 1) al volver a la app (o recuperar internet) se reconecta de cero;
+// 2) con la partida en juego se pregunta al servidor cada tanto (cada 5 s si el nivel ya terminó y nadie avanzó acá).
+let syncT=0,reconT=0;
+async function fbReconnect(){if(!isFB()||!FB.dataOn||Date.now()-reconT<4000)return;reconT=Date.now();
+  try{await FB.m.disableNetwork(FB.db);await FB.m.enableNetwork(FB.db)}catch{}}
+['online','focus'].forEach(ev=>addEventListener(ev,fbReconnect));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')fbReconnect()});
+setInterval(async()=>{
+  if(!isFB()||!FB.dataOn||document.visibilityState!=='visible')return;
+  const [gid,g]=currentGame();if(!g||g.status==='closed')return;const ts=tstate(g);if(!ts.started)return;
+  const cada=ts.done?5000:20000;if(Date.now()-syncT<cada)return;syncT=Date.now();
+  try{const d=await FB.m.getDocFromServer(FB.m.doc(FB.db,'games',gid));if(d.exists()&&JSON.stringify(d.data())!==JSON.stringify(S.games[gid])){S.games[gid]=d.data();render()}}catch{}
+},1000);
 // una vez por minuto: si una partida entró en la hora previa al inicio, pasa a "en juego" sin recargar
 // al volver a la app (estaba en segundo plano), si quedó en Partidos, vuelve a llevarte a la mesa abierta
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ui.tab==='inicio'&&ui.loaded){ui.autoGo=null;render()}});
