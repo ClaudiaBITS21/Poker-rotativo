@@ -347,6 +347,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .tplayers .chk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .edit label.chk{flex-direction:row;align-items:center;gap:8px}.edit .chk input{width:auto}
 .ttype .cutf{display:none}.ttype:has(.rbsel option[value="libre"]:checked) .cutf{display:flex}
+.ttype:has(.brksel option[value="0"]:checked) .brkatf{display:none}
 .hist{display:flex;flex-direction:column}
 .hist button{all:unset;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line)}
 .hist button:first-child{border-top:0}
@@ -523,8 +524,8 @@ const REBUY_CUT=BLINDS.indexOf(10); // en "con rebuy" el rebuy cierra al termina
 // Tipos de partida del torneo. Los del Rotativo son estos dos; cada torneo nuevo define los suyos.
 // rb: 'una' = una recompra incluida · 'libre' = rebuys hasta terminar el nivel cut · 'no' = sin recompra
 const TYPES={
-  mie:{name:'Rápido',dow:3,time:'22:30',min:7,pts:[5,2],split:[70,30],rb:'una'},
-  vie:{name:'Con rebuy',dow:5,time:'22:30',min:12,pts:[7,3,1],split:[60,30,10],rb:'libre'}
+  mie:{name:'Rápido',dow:3,time:'22:30',min:7,pts:[5,2],split:[70,30],rb:'una',brk:0},
+  vie:{name:'Con rebuy',dow:5,time:'22:30',min:12,pts:[7,3,1],split:[60,30,10],rb:'libre',brk:20}
 };
 const TYPES0=JSON.parse(JSON.stringify(TYPES));
 const T=k=>TYPES[k]||TYPES0[k]||Object.values(TYPES)[0];
@@ -1019,9 +1020,13 @@ function calc(g){
 }
 // Etapas: niveles de ciegas y un break después del 10-20. Nada avanza solo:
 // al llegar a 0:00 la etapa queda terminada hasta que alguien arranca la siguiente.
-const brkMin=g=>g.breakMin===''||g.breakMin==null?20:Math.max(0,+g.breakMin||0);
-function nextStage(g,t){ const c=cutOf(g); if(!t.brk&&(t.level||0)===c&&brkMin(g)>0) return {level:c,brk:true}; return {level:(t.level||0)+1,brk:false}; }
-function prevStage(g,t){ const c=cutOf(g); if(t.brk) return {level:t.level,brk:false}; if(t.level===c+1&&brkMin(g)>0) return {level:c,brk:true}; return {level:Math.max(0,(t.level||0)-1),brk:false}; }
+// Break: lo define el tipo de partida (brk = minutos, 0 = sin break; brkAt = después de qué nivel, por defecto el del rebuy).
+// Si en la partida se cambió a mano, manda lo de la partida (las viejas guardaban 20 sin que nadie lo eligiera).
+const tyBrk=g=>{const b=tyOf(g).brk;return b==null?20:Math.max(0,+b||0)};
+const brkMin=g=>g.brkSet||(g.breakMin!==''&&g.breakMin!=null&&+g.breakMin!==20)?Math.max(0,+g.breakMin||0):tyBrk(g);
+const brkAt=g=>{const t=tyOf(g);return t.brkAt!=null?Math.min(+t.brkAt,blindsOf(g).length-1):cutOf(g)};
+function nextStage(g,t){ const c=brkAt(g); if(!t.brk&&(t.level||0)===c&&brkMin(g)>0) return {level:c,brk:true}; return {level:(t.level||0)+1,brk:false}; }
+function prevStage(g,t){ const c=brkAt(g); if(t.brk) return {level:t.level,brk:false}; if(t.level===c+1&&brkMin(g)>0) return {level:c,brk:true}; return {level:Math.max(0,(t.level||0)-1),brk:false}; }
 function tstate(g){
   const t={running:false,anchor:0,acc:0,level:0,brk:false,...(g.timer||{})};
   const dur=(t.brk?brkMin(g):(+g.levelMin||T(g.type).min))*60000;
@@ -1036,7 +1041,7 @@ const tooEarly=(g,ts)=>!ts.started&&Date.now()<startAt(g);
 // Una partida se puede terminar recién cuando empezó: se arrancó el reloj o ya pasó la hora programada.
 const canFinish=g=>tstate(g).started||Date.now()>=startAt(g);
 const startLabel=g=>g.date===today()?`Empieza a las ${g.time||'00:00'}`:`Empieza el ${fmtDate(g.date)}${g.time?' a las '+g.time:''}`;
-const rebuyClosed=(ts,g)=>{const c=cutOf(g);return ts.level>c||ts.brk||(ts.level===c&&ts.done)};
+const rebuyClosed=(ts,g)=>{const c=cutOf(g);return ts.level>c||(ts.brk&&ts.level>=c)||(ts.level===c&&ts.done)};
 // sin reloj, se puede eliminar desde la hora de inicio; con reloj, en Con rebuy recién cuando se cierra el rebuy
 const canKO=(g,ts)=>g.status!=='closed'&&(ts.started?(!isLibre(g)||rebuyClosed(ts,g)):Date.now()>=startAt(g));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
@@ -1046,11 +1051,11 @@ function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,T(g.type).p
 const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
 function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level,g)}`}
 function ladder(g,ts){
-  const vie=isLibre(g),hasBrk=brkMin(g)>0,CUT=cutOf(g);
+  const vie=isLibre(g),hasBrk=brkMin(g)>0,CUT=cutOf(g),BA=brkAt(g);
   return blindsOf(g).map((b,i)=>{
     const cur=i===ts.level&&!ts.brk,past=i<ts.level||(i===ts.level&&ts.brk);
     let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===CUT?'cut':''}">${b}-${b*2}</span>`;
-    if(i===CUT&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>CUT?'past':''}">Break ${brkMin(g)}'</span>`;
+    if(i===BA&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>BA?'past':''}">Break ${brkMin(g)}'</span>`;
     return h;
   }).join('');
 }
@@ -1232,7 +1237,7 @@ function vGame(gid,g){
         ?`<input type="text" inputmode="numeric" class="money" id="g-foodpp" data-chg="num" data-k="foodPP" value="${moneyIn(g.foodPP)}" placeholder="Por persona" ${closed?'disabled':''}>`
         :`<input type="text" inputmode="numeric" class="money" id="g-food" data-chg="num" data-k="food" value="${moneyIn(g.food)}" placeholder="Total de la comida" ${closed?'disabled':''}>`}<span class="fmode">${[['pp','Por persona'],['total','Total']].map(([k,l])=>`<button type="button" data-act="foodMode" data-v="${k}" aria-pressed="${foodModeOf(g)===k}" ${closed?'disabled':''}>${l}</button>`).join('')}</span></label>
       <label><span class="label">Minutos por nivel</span><input type="number" min="1" step="1" id="g-min" data-chg="num" data-k="levelMin" value="${g.levelMin??t.min}" ${closed?'disabled':''}></label>
-      <label><span class="label">Break tras 10-20 (min)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
+      <label><span class="label">Break tras el ${blind(brkAt(g),g)} (min, 0 = sin break)</span><input type="number" min="0" step="1" id="g-brk" data-chg="num" data-k="breakMin" value="${brkMin(g)}" ${closed?'disabled':''}></label>
     </div>
     <div class="small muted">${rbm(g)==='no'?`Pozo = entrada × ${c.playing.length} jugadores.`:isUna(g)&&!(+g.rebuyPrice)?`Pozo = entrada × ${c.playing.length} jugadores (la recompra está incluida en la entrada; si se cobra aparte, poné su precio).`:`Pozo = entrada × ${c.playing.length} + ${isLibre(g)?'rebuy':'recompra'} × ${c.rebuys}.`}
       ${c.eaters.length?(c.perPerson?` Comida: <b>${money(c.foodShare)}</b> por persona × ${c.eaters.length} = ${money(c.food)}.`:` Comida: ${money(c.food)} ÷ ${c.eaters.length} = <b>${money(c.foodShare)}</b> por persona.`):''}</div>
@@ -1653,7 +1658,7 @@ function vigente(){
 // Panel de la dueña: torneos (nombre, link, clave, tipos de partida, jugadores) y quién ya entró.
 // Campos de un torneo (nombre, portada, lugar y tipos de partida): los usan "Editar" y "Nuevo torneo".
 // Tipo de partida por defecto para un torneo nuevo
-const TYPE_NEW={name:'Partida',dow:3,time:'21:00',min:12,pts:[5,2],split:[70,30],rb:'una'};
+const TYPE_NEW={name:'Partida',dow:3,time:'21:00',min:12,pts:[5,2],split:[70,30],rb:'una',brk:0};
 const RBOPT=[['una','Una recompra incluida en la entrada'],['libre','Rebuys libres hasta un nivel'],['no','Sin recompra']];
 // Tipos que se están editando en el formulario de un torneo (se pueden agregar y quitar)
 function tkeysOf(tid,t){ui.tkeys=ui.tkeys||{};if(!ui.tkeys[tid])ui.tkeys[tid]=t.types&&Object.keys(t.types).length?Object.keys(t.types):['t1'];return ui.tkeys[tid]}
@@ -1674,6 +1679,8 @@ function tourFields(tid,t){
             ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
             <label><span class="label">Recompra</span><select class="rbsel" id="tt-${tid}-${k}-rb">${RBOPT.map(([v,l])=>`<option value="${v}" ${y.rb===v?'selected':''}>${l}</option>`).join('')}</select></label>
             <label class="cutf"><span class="label">Rebuys hasta terminar el nivel</span><select id="tt-${tid}-${k}-cut">${B.map((b,j)=>`<option value="${j}" ${cut===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
+            <label><span class="label">Break</span><select class="brksel" id="tt-${tid}-${k}-brk">${[0,5,10,15,20,25,30].map(m=>`<option value="${m}" ${(y.brk==null?20:+y.brk)===m?'selected':''}>${m?m+' minutos':'Sin break'}</option>`).join('')}</select></label>
+            <label class="brkatf"><span class="label">Break después del nivel</span><select id="tt-${tid}-${k}-brkat">${B.map((b,j)=>`<option value="${j}" ${(y.brkAt!=null?+y.brkAt:cut)===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
             ${tf(k,'pts','Puntos por puesto (hasta 3, ej. 7,3,1)',y.pts.join(','))}
             ${tf(k,'split','Premio en % (ej. 60,30,10)',y.split.join(','))}
             <label class="full"><span class="label">Ciegas (la chica de cada nivel; la grande es el doble)</span><input type="text" id="tt-${tid}-${k}-blinds" value="${esc(B.join(', '))}" inputmode="numeric"></label>
@@ -1693,6 +1700,7 @@ function readTour(tid){
     const y={name:nm,dow:+g(`tt-${tid}-${k}-dow`),time:g(`tt-${tid}-${k}-time`),min,pts,split,rb};
     if(bl.join()!==BLINDS.join())y.blinds=bl;
     if(rb==='libre')y.cut=Math.min(+g(`tt-${tid}-${k}-cut`)||0,bl.length-1);
+    y.brk=Math.max(0,+g(`tt-${tid}-${k}-brk`)||0);if(y.brk)y.brkAt=Math.min(+g(`tt-${tid}-${k}-brkat`)||0,bl.length-1);
     types[k]=y;
   }
   if(!Object.keys(types).length)return {err:'El torneo necesita al menos un tipo de partida.'};
@@ -2043,7 +2051,7 @@ const ACT={
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
       const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||T(type).time||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
-        entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||T(type).min,breakMin:prev.breakMin??20,parts:{},result:{},
+        entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||T(type).min,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=T(type).rb==='libre'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
@@ -2196,7 +2204,7 @@ let armT=null;
 function arm(k){ui.armed=k;render();clearTimeout(armT);armT=setTimeout(()=>{ui.armed=null;render()},4000)}
 const CHG={
   rq:el=>{const [gid]=currentGame();Store.update('games',gid,{parts:{[el.dataset.pid]:{rq:el.checked}}})},
-  num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v})},
+  num:el=>{const [gid]=currentGame();const raw=el.classList.contains('money')?digits(el.value):el.value;const v=raw===''?'':Math.max(0,+raw);Store.update('games',gid,{[el.dataset.k]:v,...(el.dataset.k==='breakMin'?{brkSet:true}:{})})},
   nd:el=>{ui[el.dataset.k]=el.value;render()},
   time:el=>{const [gid,g]=currentGame();if(canFinish(g))return;Store.update('games',gid,{time:el.value})},
   tourPl:el=>{FB.setInTour(el.dataset.pid,el.dataset.tid,el.checked).catch(fail)},
@@ -2227,15 +2235,17 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{const el=e.target;
   if(el.dataset&&el.dataset.mask==='fecha'){const d=el.value.replace(/\D/g,'').slice(0,8);el.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d;return}
   if(!el.classList||!el.classList.contains('money'))return;el.value=moneyIn(el.value)});
-document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el){clearTimeout(numT);CHG[el.dataset.chg](el)}});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el&&el.dataset.chg!=='num')CHG[el.dataset.chg](el)}); // los números se guardan abajo (al escribir y al salir)
 // Entrada, comida, etc. se guardan solos mientras se escribe (no hace falta salir del campo):
 // si la pantalla se redibuja en el medio (el reloj, otro celular) el "change" del campo nuevo nunca llega.
 let numT=null;
 document.addEventListener('input',e=>{const el=e.target;if(el.dataset?.chg!=='num')return;
   clearTimeout(numT);numT=setTimeout(()=>{const x=document.getElementById(el.id)||el;CHG.num(x)},700)});
 document.addEventListener('focusout',e=>{const el=e.target;if(el.dataset?.chg!=='num')return;
-  const [,g]=currentGame()||[];if(!g)return;const raw=el.classList.contains('money')?digits(el.value):el.value;
-  if(String(g[el.dataset.k]??'')!==String(raw===''?'':Math.max(0,+raw))){clearTimeout(numT);CHG.num(el)}});
+  const [,g]=currentGame()||[];if(!g)return;const k=el.dataset.k,raw=el.classList.contains('money')?digits(el.value):el.value;
+  const shown=k==='breakMin'?brkMin(g):k==='levelMin'?(g.levelMin??T(g.type).min):(g[k]??'');
+  // se guarda un ratito después, para no redibujar la pantalla en medio del toque a un botón
+  if(String(shown)!==String(raw===''?'':Math.max(0,+raw))){clearTimeout(numT);numT=setTimeout(()=>CHG.num(el),300)}});
 // Lo que se va escribiendo en un formulario (torneo nuevo, fichas, claves…) se guarda aparte, así no se pierde
 // cuando la pantalla se redibuja porque llegó un cambio de otro celular.
 ui.drafts={};
