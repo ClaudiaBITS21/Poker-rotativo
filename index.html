@@ -1098,6 +1098,9 @@ function render(){
   const gated=isFB()&&ui.gate!=='ok';
   if(ADMIN_HOME&&isOwner())ui.tab='admin';
   if(ui.tab==='admin'&&!isOwner())ui.tab='inicio';
+  // si la mesa ya abrió (1 hora antes) y estás anotado, la app te lleva directo a esa partida (una vez por partida)
+  if(ui.tab==='inicio'&&ui.loaded&&!ADMIN_HOME&&me()){const v=vigente(),st=v&&v[1].parts?.[me()]?.st;
+    if(v&&ui.autoGo!==v[0]&&(st==='juega'||st==='come')){ui.autoGo=v[0];ui.gameId=v[0];ui.tab='partida';scrollTo(0,0)}}
   $('#tabs').innerHTML=gated||ADMIN_HOME?'':[['inicio','Partidos'],['partida','Partida'],['jugadores','Jugadores'],...(soloVie()?[]:[['stats','Tabla']]),...(puedeCumples()?[['cumples','🎂']]:[]),...(isOwner()?[['admin','⚙️']]:[])]
     .map(([k,l])=>`<button data-act="tab" data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('');
   const m=me();
@@ -1941,6 +1944,8 @@ function tick(fromRender){
 }
 setInterval(()=>tick(false),250);
 // una vez por minuto: si una partida entró en la hora previa al inicio, pasa a "en juego" sin recargar
+// al volver a la app (estaba en segundo plano), si quedó en Partidos, vuelve a llevarte a la mesa abierta
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ui.tab==='inicio'&&ui.loaded){ui.autoGo=null;render()}});
 setInterval(()=>{if(ui.tab!=='inicio'||!ui.loaded)return;const v=(vigente()||[])[0]||null;if(v!==ui.lastVig){ui.lastVig=v;render()}},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render()});
 // Los navegadores no dejan sonar nada hasta que la persona toca la página:
