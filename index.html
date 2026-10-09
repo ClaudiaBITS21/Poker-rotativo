@@ -1186,12 +1186,14 @@ function vNewGame(){
 function vGame(gid,g){
   const t=T(g.type),c=calc(g),parts=g.parts||{},closed=g.status==='closed',m=me();
   const ts=tstate(g),rbClosed=isLibre(g)&&rebuyClosed(ts,g);
+  // recompras y rebuys se anotan recién cuando arrancó la partida (reloj en marcha o ya es la hora de inicio)
+  const preJuego=!closed&&!canFinish(g);
   const list=rankedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
     let extra='<span></span>';
-    if(plays&&isUna(g)) extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed?'disabled':''} title="${pt.rq?'Ya usó su recompra (tocá para deshacer)':'Recompra disponible: tocá cuando la pida'}" aria-label="${pt.rq?'Recompra usada':'Recompra disponible'}">${pt.rq?'R✓':'R'}</button>`;
-    if(plays&&isLibre(g)) extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
+    if(plays&&isUna(g)) extra=`<button class="rq" data-act="rq" data-pid="${id}" aria-pressed="${!!pt.rq}" ${closed||(preJuego&&!pt.rq)?'disabled':''} title="${pt.rq?'Ya usó su recompra (tocá para deshacer)':'Recompra disponible: tocá cuando la pida'}" aria-label="${pt.rq?'Recompra usada':'Recompra disponible'}">${pt.rq?'R✓':'R'}</button>`;
+    if(plays&&isLibre(g)) extra=`<span class="rbc"><button data-act="rb" data-pid="${id}" data-d="-1" ${closed||!(pt.rb>0)?'disabled':''} aria-label="Quitar rebuy">−</button><span class="n num" title="Rebuys">${pt.rb||0}</span><button data-act="rb" data-pid="${id}" data-d="1" ${closed||rbClosed||preJuego?'disabled':''} aria-label="Sumar rebuy">+</button></span>`;
     const ajena=isFB()&&!isAdmin()&&m&&id!==m;
     const seg=[['no','✕'],['juega','♠'],['come','🍽']].map(([k,l])=>`<button data-act="st" data-pid="${id}" ${ajena?'disabled':''} data-v="${k}" class="${k==='come'?'emo ':''}${st===k?'on-'+k:''}" ${closed?'disabled':''} aria-pressed="${st===k}" aria-label="${ST[k]}">${l}</button>`).join('');
     return `<div class="arow ${id===m?'mine':''} ${st==='no'?'out':''}">${avBtn(id,30)}<span class="aname">${esc(p.name)}${ptag(id)}${id===m?' <span class="badge me">Vos</span>':''}${p.active===false?' <span class="small muted">(ret.)</span>':''}</span>${extra}<div class="aseg">${seg}</div></div>`;
@@ -1231,7 +1233,7 @@ function vGame(gid,g){
   <section class="card r" data-suit="♥">
     <div class="row spread"><h2>Asistencia</h2><span class="row" style="gap:8px"><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span>${closed?'':`<button class="btn mini" data-act="addPToggle">${ui.addingP?'Cerrar':'＋ Jugador'}</button>`}</span></div>
     ${ui.addingP&&!closed?`<form class="row" data-form="addPlayerGame"><input type="text" id="npg-name" placeholder="Nombre del jugador nuevo" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" type="submit">Agregar${isFB()&&!isAdmin()?'':' y anotar'}</button></form>`:''}
-    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${isUna(g)?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':isLibre(g)?'<span><b>− +</b> rebuys</span>':''}</div>
+    <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${isUna(g)?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':isLibre(g)?'<span><b>− +</b> rebuys</span>':''}${preJuego&&rbm(g)!=='no'?`<span class="muted">${isLibre(g)?'Los rebuys':'Las recompras'} se anotan cuando arranca la partida</span>`:''}</div>
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
   </section>
 
@@ -2168,8 +2170,8 @@ const ACT={
   unko:d=>{const [gid,g]=currentGame(),g2=structuredClone(g);g2.parts[d.pid].ko=0;
     Store.update('games',gid,{parts:{[d.pid]:{ko:0}},...(g.resultManual?{}:{result:resultFrom(g2)})})},
   resultAuto:()=>{const [gid,g]=currentGame();Store.update('games',gid,{resultManual:false,result:resultFrom(g)})},
-  rq:d=>{const [gid,g]=currentGame();Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
-  rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
+  rq:d=>{const [gid,g]=currentGame();if(!canFinish(g)&&!g.parts?.[d.pid]?.rq)return;Store.update('games',gid,{parts:{[d.pid]:{rq:!g.parts?.[d.pid]?.rq}}})},
+  rb:d=>{const [gid,g]=currentGame();const cur=g.parts?.[d.pid]?.rb||0;if(+d.d>0&&!canFinish(g))return;Store.update('games',gid,{parts:{[d.pid]:{rb:Math.max(0,cur+ +d.d)}}})},
   tplay:()=>{const [gid,g]=currentGame(),ts=tstate(g);if(ts.done)return ACT.tgo();if(tooEarly(g,ts))return;setTimer(gid,{running:true,anchor:Date.now(),acc:ts.el,level:ts.level,brk:ts.brk})},
   tpause:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:false,anchor:0,acc:ts.el,level:ts.level,brk:ts.brk})},
   tgo:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=nextStage(g,ts.t);setTimer(gid,{running:true,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
