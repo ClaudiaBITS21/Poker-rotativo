@@ -271,10 +271,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .pplayers li.ko b{min-width:2.2em;text-align:right;font-weight:500}
 .proj .pplayers li.ko .nm{font-weight:500}
 .proj .pplayers li:not(.ko)+li.ko{margin-top:calc(.5*var(--pw))}
-.proj.tres{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
-.proj.tres .clock{font-size:clamp(64px,min(calc(14*var(--pw)),calc(30*var(--ph))),300px)}
 .proj .pmesas.tres{gap:calc(1*var(--pw))}
-.proj .pmesas.tres .ptag{display:none}
 .proj .pmesas.tres .pplayers .av{display:none}
 .proj .pmesas.tres .pplayers{font-size:clamp(11px,min(calc(1.2*var(--pw)),calc(2.2*var(--ph))),22px)}
 .proj .pmesas.tres .pplayers li:not(.ko){padding:calc(.12*var(--ph)) 0}
@@ -447,7 +444,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .clock{cursor:pointer}
 .proj .plvl{all:unset;cursor:pointer;color:inherit}
 .proj .plvl .caret{font-size:.7em;opacity:.7}
-.proj .pmoney{display:flex;align-items:flex-end;gap:calc(1.6*var(--pw));margin-top:calc(.6*var(--pw));padding-top:calc(1*var(--pw));border-top:1px solid rgba(222,173,110,.3)}
+.proj .pmoney{display:flex;flex-direction:column;align-items:stretch;gap:calc(1.6*var(--pw));margin-top:calc(.6*var(--pw));padding-top:calc(1*var(--pw));border-top:1px solid rgba(222,173,110,.3)}
 .proj .pmoney .ppotw{flex:none}
 .proj .pmoney .pprz{flex:1}
 .proj .pprz{flex-direction:row;gap:calc(.8*var(--pw))}
@@ -465,6 +462,16 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .tctl:hover,.proj .tctl:focus-within,.proj .tctl.isdone{opacity:1}
 .proj .donemsg{font-size:clamp(16px,calc(1.9*var(--pw)),34px);align-self:flex-start;padding:calc(.5*var(--pw)) calc(1.2*var(--pw))}
 .proj .tctl .btn.go{font-size:clamp(16px,calc(1.6*var(--pw)),28px)}
+.proj{grid-template-columns:auto minmax(0,1fr)}
+.proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
+.proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
+.proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
+.proj .pmoney{margin-top:0;gap:calc(1.2*var(--ph))}
+.proj .pmoney .pprz{flex:none}
+.proj .pplayers{font-size:clamp(11px,min(calc(2*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),32px)!important}
+.proj .ptop{display:flex;flex-direction:column;gap:calc(2.2*var(--ph))}
+.proj .pplayers li:not(.ko){min-height:calc(78*var(--ph) / (var(--rows) + 2.6));padding:0!important;box-sizing:border-box}
+.proj.tres .pplayers{font-size:clamp(11px,min(calc(1.65*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),28px)!important}
 /* teléfono en vertical: la pantalla de juego se gira 90° y se ve apaisada igual */
 @media (orientation:portrait){
   .proj{--pw:1dvh;--ph:1vw;inset:auto;top:0;left:100vw;width:100dvh;height:100vw;transform-origin:0 0;transform:rotate(90deg);
@@ -1493,16 +1500,17 @@ function renderBig(){
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
-      <div class="phead"><button class="plvl" data-act="lvlOpen" title="Ver los niveles"><b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min <span class="caret">${ui.lvlOpen?'▴':'▾'}</span></button></div>
+      <div class="ptop">
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
-      <div><div class="plab">${ts.brk?'Descanso':'Ciegas'}</div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></div>
+      <button class="plvl" data-act="lvlOpen" title="Cambiar de nivel"><div class="plab">${ts.brk?'Break':'Nivel '+(ts.level+1)} · ${ts.brk?brkMin(g):+g.levelMin||t.min} min <span class="caret">${ui.lvlOpen?'▴':'▾'}</span></div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></button>
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
+      </div>
       <div class="pmoney">
         <div class="ppotw"><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
         <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
-    <aside class="pside">
+    <aside class="pside" style="--rows:${Math.max(4,...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length),tablesOf(g).length?0:Math.ceil(c.playing.length/(c.playing.length>8?2:1)))}">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
       ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
