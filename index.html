@@ -462,8 +462,10 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .tctl:hover,.proj .tctl:focus-within,.proj .tctl.isdone{opacity:1}
 .proj .donemsg{font-size:clamp(16px,calc(1.9*var(--pw)),34px);align-self:flex-start;padding:calc(.5*var(--pw)) calc(1.2*var(--pw))}
 .proj .tctl .btn.go{font-size:clamp(16px,calc(1.6*var(--pw)),28px)}
-.proj{grid-template-columns:minmax(0,1fr) min(calc((8 + var(--cols) * 17) * var(--pw)),60%)}
-.proj .pmain{justify-self:center;width:max-content;max-width:100%}
+/* la columna del reloj y el pozo tiene siempre el mismo ancho y lugar; el resto es para los nombres */
+.proj{grid-template-columns:calc(44*var(--pw)) minmax(0,1fr)}
+.proj .pmain{justify-self:stretch;min-width:0}
+.proj .pplayers.one{max-width:calc(30*var(--pw))}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
 .proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
@@ -1480,7 +1482,7 @@ function vPlayersBig(g,c,players,tag){
     return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
   const sentado=new Set(),cols=usadas.map(i=>M[i].filter(id=>by[id]&&!sentado.has(id)&&sentado.add(id)).map(id=>by[id]));
   const sueltos=players.filter(x=>!sentado.has(x.id));
-  if(!dos)return ul(cols.length?[...cols[0],...sueltos]:players,players.length<=8);
+  if(!dos)return ul(cols.length?[...cols[0],...sueltos]:players,players.length<=6);
   cols[0].push(...sueltos);
   const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i+1} · ${n||'cerrada'}</div>`};
   return `<div class="pmesas ${cols.length>2?'tres':''}" style="grid-template-columns:repeat(${cols.length},minmax(0,1fr))">${cols.map((xs,j)=>`<div>${head(usadas[j],xs)}${ul(xs,true)}</div>`).join('')}</div>`;
@@ -1504,8 +1506,7 @@ function renderBig(){
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   // el panel de los nombres crece según cuántas columnas hay (1, 2 o 3 mesas), no ocupa siempre todo el ancho
-  const ncols=tablesOf(g).length>1?tablesOf(g).length:(c.playing.length>8?2:1);
-  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" style="--cols:${ncols}" role="dialog" aria-label="Pantalla de juego">
+  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
       <div class="ptop">
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
@@ -1517,7 +1518,7 @@ function renderBig(){
         <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
-    <aside class="pside" style="--rows:${Math.max(4,...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length),tablesOf(g).length?0:Math.ceil(c.playing.length/(c.playing.length>8?2:1)))}">
+    <aside class="pside" style="--rows:${Math.max(4,tablesOf(g).length>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
       ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
