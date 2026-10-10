@@ -1724,6 +1724,8 @@ async function tablaPng(){
   const last=Object.entries(S.games).filter(([,g])=>g.status==='closed'&&(type==='all'||g.type===type)&&(g.result||{}).p1)
     .sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].closedAt||0)-(a[1].closedAt||0))[0];
   const rows=st.rows.filter(r=>r.pts>0);
+  // puesto que tenía cada uno antes de la última partida (para marcar ▲ a los que subieron)
+  const prevPos={};if(last)stats(type,false,last[0]).rows.filter(r=>r.pts>0).forEach((r,i)=>prevPos[r.id]=i+1);
   const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
   const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
   await Promise.all(['800 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
@@ -1761,6 +1763,8 @@ async function tablaPng(){
     x.fillStyle=i<3?V('--gold-2'):V('--muted');x.font=`600 30px ${NUM}`;x.textAlign='center';x.fillText(i+1,cx.pos,b);
     x.fillStyle=V('--ink');x.font=`${gan?700:600} 30px ${BOD}`;x.textAlign='left';
     let nm=r.name;while(x.measureText(nm).width>cx.pts-cx.name-80&&nm.length>3)nm=nm.slice(0,-2)+'…';x.fillText(nm,cx.name,b);
+    if(last){const pp=prevPos[r.id],d=pp?pp-(i+1):0;
+      if(d>0){x.fillStyle='#1F7A45';x.font=`600 24px ${NUM}`;x.textAlign='right';x.fillText('▲ '+d,cx.pts-110,b-2)}}
     x.fillStyle=V('--ink');x.font=`600 32px ${NUM}`;x.textAlign='right';x.fillText(r.pts,cx.pts,b);
   });
   x.textAlign='center';x.fillStyle='rgba(255,246,236,.7)';x.font=`400 22px ${BOD}`;x.fillText(location.host||'poker',W/2,H-42);
