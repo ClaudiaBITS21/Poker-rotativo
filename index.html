@@ -255,6 +255,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .liveav{display:flex;flex-wrap:wrap;gap:4px}
 .btn.ghost{background:transparent;color:var(--on-felt);border-color:rgba(222,173,110,.45)}
 .card .btn.go{min-height:48px}
+table:not(.mas) .x{display:none}
 .kolist{display:flex;flex-wrap:wrap;gap:6px}
 .mover{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
 .mover[open]{gap:10px}
@@ -1789,21 +1790,21 @@ function vStats(){
       .sort((a,b)=>b.avg-a.avg||b.pj-a.pj||a.name.localeCompare(b.name,'es'));
     top=rows.filter(r=>r.avg>0).slice(0,3);
     note=`Cada número está dividido por las partidas que jugó esa persona, así se compara a quien va siempre con quien va poco. No incluye la liga anterior, que no tiene partidas cargadas.`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
-    row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganado/PJ</th><th class="r x">Ganó</th><th class="r x">Podio</th><th class="r x">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r x">Pts</th>`;
+    row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${money(r.won/r.pj)}</td><td class="r x">${pctOf(r.p1,r.pj)}</td><td class="r x">${pctOf(r.pod,r.pj)}</td><td class="r x">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r x">${r.pts}</td>`;
   }else{
     rows=st.rows.filter(r=>r.pts>0); // solo los que sumaron algún punto
     top=rows.filter(r=>r.pts>0).slice(0,3);
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Ganado</th>`;
-    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Ganado</th><th class="r x">Asist.</th><th class="r x">1º</th><th class="r x">2º</th>${mie?'':'<th class="r x">3º</th>'}<th class="r x">${mie?'Recompras':'Rebuys'}</th>`;
+    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${r.won?money(r.won):''}</td><td class="r x">${pct(r)}</td><td class="r x">${r.p1||''}</td><td class="r x">${r.p2||''}</td>${mie?'':`<td class="r x">${r.p3||''}</td>`}<td class="r x">${r.rb||''}</td>`;
   }
   const split=!per&&ui.statsType==='all';
   if(split){
     const bt={mie:stats('mie'),vie:stats('vie')},by=k=>Object.fromEntries(bt[k].rows.map(r=>[r.id,r.pts]));
     const pm=by('mie'),pv=by('vie');rows=rows.map(r=>({...r,ptsMie:pm[r.id]||0,ptsVie:pv[r.id]||0}));
-    head=head.replace('<th class="r">PJ</th>','<th class="r">Mié</th><th class="r">Vie</th><th class="r">PJ</th>');
-    const base=row;row=r=>base(r).replace('</b></td>',`</b></td><td class="r muted">${r.ptsMie||''}</td><td class="r muted">${r.ptsVie||''}</td>`);
+    head=head.replace('<th class="r x">Asist.</th>','<th class="r x">Mié</th><th class="r x">Vie</th><th class="r x">Asist.</th>');
+    const base=row;row=r=>{const h=base(r),i=h.indexOf('<td class="r x">');return h.slice(0,i)+`<td class="r x muted">${r.ptsMie||''}</td><td class="r x muted">${r.ptsVie||''}</td>`+h.slice(i)};
     note+=' Mié y Vie = puntos sumados en partidas Rápido y Con rebuy de esta app.';
   }
   const m=me();
@@ -1812,10 +1813,10 @@ function vStats(){
     <div class="gamepick">${tabs}</div>
     <div class="gamepick">${modes}</div>
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
-    ${rows.length?`<div class="tw"><table class="num">
+    ${rows.length?`<div class="tw"><table class="num ${ui.tabMas?'mas':''}">
       <thead><tr>${head}</tr></thead>
       <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td>${esc(r.name)}</td>${row(r)}</tr>`).join('')}</tbody>
-    </table></div>`:`<p class="empty">${per?'Todavía nadie jugó una partida cerrada.':'Todavía no hay partidas cerradas.'}</p>`}
+    </table></div><button class="btn mini" data-act="tabMas" style="align-self:flex-start">${ui.tabMas?'Ver menos ▴':'Ver más columnas ▾'}</button>`:`<p class="empty">${per?'Todavía nadie jugó una partida cerrada.':'Todavía no hay partidas cerradas.'}</p>`}
   </section>`;
 }
 
@@ -2383,6 +2384,7 @@ const ACT={
   lvlOpen:()=>{ui.lvlOpen=!ui.lvlOpen;render()},
   goLvl:d=>{const k='lvl-'+d.v+(d.b?'b':'');if(ui.armed!==k){arm(k);return}ui.armed=null;ui.lvlOpen=false;
     const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:+d.v,brk:!!d.b})},
+  tabMas:()=>{ui.tabMas=!ui.tabMas;render()},
   verTodos:()=>{ui.verTodos=!ui.verTodos;render()},
   seatOk:d=>{ui.seatOk=d.v;try{localStorage.setItem('poker.seat.'+d.gid,d.v)}catch{}render()},
   seatHide:d=>{ui.seatOk=d.v;try{localStorage.setItem('poker.seat.'+d.gid,d.v);localStorage.setItem('poker.seathide.'+d.gid,d.v)}catch{}render()},
