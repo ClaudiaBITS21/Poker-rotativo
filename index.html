@@ -1343,7 +1343,7 @@ function vMesas(g,c){
   const armed=ui.armed==='mesas',sz=mesaSizes(n,k);
   const yo=me(),cols=all.filter(t=>t.some(Boolean)).length;
   const list=(t,i)=>{if(!t.some(Boolean))return '';const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+(cols>1?'':' en juego'):'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''} ${id===yo?'mine':''}"><b class="seat num" title="Asiento">${s+1}</b>${cols>1?'':avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?`<span class="badge gold" title="Reparte">${cols>1?'Rep.':'Reparte'}</span>`:''}</li>`).join('')}</ol></div>`};
-  const mio=yo&&all.findIndex(t=>t.includes(yo));
+  const mio=yo?all.findIndex(t=>t.includes(yo)):-1;
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${k===1?'1 mesa':k+' mesas'}</span></div>
     <p class="small muted" style="margin:0">La Mesa 1 es para ${MESA_CAP[0]} y las otras para ${MESA_CAP[1]}: se agrega una mesa cuando ya no entran. ${k>1?`Hoy son ${k} mesas de ${sz.join(', ')}.`:''} El número es el asiento: el 1 reparte (si no elegís quién, se sortea) y del 2 en adelante se sortea.</p>
