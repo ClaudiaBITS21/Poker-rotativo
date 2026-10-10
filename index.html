@@ -466,7 +466,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
 .proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
-.proj .pmoney{margin-top:0;gap:calc(1.2*var(--ph))}
+.proj .pmoney{margin-top:0;gap:calc(2.6*var(--ph));padding-top:calc(2.4*var(--ph))}
+.proj .ppotw{display:flex;flex-direction:column;gap:calc(.8*var(--ph))}
+.proj .ppotl{display:flex;align-items:baseline;gap:calc(1.2*var(--pw))}
+.proj .prb{font-family:var(--num);font-weight:500;font-size:clamp(14px,min(calc(1.8*var(--pw)),calc(3.4*var(--ph))),34px);color:var(--pmut)}
+.proj .pprz div{padding:calc(1*var(--ph)) 0!important;gap:calc(.3*var(--ph))!important}
 .proj .pmoney .pprz{flex:none}
 .proj .pplayers{font-size:clamp(11px,min(calc(2*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),32px)!important}
 .proj .ptop{display:flex;flex-direction:column;gap:calc(2.2*var(--ph))}
@@ -1506,7 +1510,7 @@ function renderBig(){
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
       </div>
       <div class="pmoney">
-        <div class="ppotw"><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
+        <div class="ppotw"><div class="plab">Pozo</div><div class="ppotl"><span class="ppot num">${money(c.pot)}</span><span class="prb num">(${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')})</span></div></div>
         <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
