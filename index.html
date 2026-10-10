@@ -447,6 +447,9 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .clock{cursor:pointer}
 .proj .plvl{all:unset;cursor:pointer;color:inherit}
 .proj .plvl .caret{font-size:.7em;opacity:.7}
+.proj .pmoney{display:flex;align-items:flex-end;gap:calc(1.6*var(--pw));margin-top:calc(.6*var(--pw));padding-top:calc(1*var(--pw));border-top:1px solid rgba(222,173,110,.3)}
+.proj .pmoney .ppotw{flex:none}
+.proj .pmoney .pprz{flex:1}
 .proj .pprz{flex-direction:row;gap:calc(.8*var(--pw))}
 .proj .pprz div{flex:1;flex-direction:column;align-items:center;justify-content:center;gap:0;border:1px solid var(--pline);border-radius:calc(.8*var(--pw));padding:calc(.4*var(--pw)) 0;background:rgba(0,0,0,.18)}
 .proj .pprz div span{font-size:.75em}
@@ -1486,11 +1489,13 @@ function renderBig(){
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
       <div><div class="plab">${ts.brk?'Descanso':'Ciegas'}</div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></div>
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
+      <div class="pmoney">
+        <div class="ppotw"><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
+        <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
+      </div>
     </div>
     <aside class="pside">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
-      <div><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
-      <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
       ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
     </aside>
