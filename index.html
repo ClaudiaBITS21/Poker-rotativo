@@ -453,6 +453,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .pprz{flex-direction:row;gap:calc(.8*var(--pw))}
 .proj .pprz div{flex:1;flex-direction:column;align-items:center;justify-content:center;gap:0;border:1px solid var(--pline);border-radius:calc(.8*var(--pw));padding:calc(.4*var(--pw)) 0;background:rgba(0,0,0,.18)}
 .proj .pprz div span{font-size:.75em}
+.proj .pprz .ppts{font-size:.6em;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;line-height:1.2}
 .proj .lvlpick{position:absolute;left:calc(2.4*var(--pw));right:calc(2.4*var(--pw));bottom:calc(2*var(--pw));z-index:2;display:flex;flex-wrap:wrap;gap:calc(.5*var(--pw));padding:calc(1.2*var(--pw));background:rgba(20,6,4,.92);border:1px solid rgba(222,173,110,.4);border-radius:calc(1.4*var(--pw));box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .proj .lvlpick button{font-family:var(--num);font-size:clamp(13px,calc(1.3*var(--pw)),24px);padding:.25em .7em;border-radius:999px;border:1px solid var(--pline);background:rgba(0,0,0,.25);color:var(--pfg);cursor:pointer}
 .proj .lvlpick button.past{opacity:.5}
@@ -1461,7 +1462,9 @@ function vPlayersBig(g,c,players,tag){
   const tg=!dos?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
   const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
     :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
-  const ul=(xs,one)=>{const vivos=xs.filter(x=>!x.p.ko),kos=xs.filter(x=>x.p.ko).sort((a,b)=>a.pl-b.pl);
+  // los que siguen, ordenados por cantidad de rebuys (más arriba el que más hizo)
+  const nrb=x=>isLibre(g)?(x.p.rb||0):(x.p.rq?1:0);
+  const ul=(xs,one)=>{const vivos=xs.filter(x=>!x.p.ko).sort((a,b)=>nrb(b)-nrb(a)),kos=xs.filter(x=>x.p.ko).sort((a,b)=>a.pl-b.pl);
     return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
   const sentado=new Set(),cols=usadas.map(i=>M[i].filter(id=>by[id]&&!sentado.has(id)&&sentado.add(id)).map(id=>by[id]));
   const sueltos=players.filter(x=>!sentado.has(x.id));
@@ -1496,7 +1499,7 @@ function renderBig(){
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
       <div class="pmoney">
         <div class="ppotw"><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
-        <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
+        <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
     <aside class="pside">
