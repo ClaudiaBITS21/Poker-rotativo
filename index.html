@@ -1719,8 +1719,6 @@ async function tablaPng(){
   const type=ui.statsType||'all',st=stats(type);
   const last=Object.entries(S.games).filter(([,g])=>g.status==='closed'&&(type==='all'||g.type===type)&&(g.result||{}).p1)
     .sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].closedAt||0)-(a[1].closedAt||0))[0];
-  const prev=last?stats(type,false,last[0]):null,prevPos={},prevPts={};
-  if(prev)prev.rows.forEach((r,i)=>{prevPos[r.id]=i+1;prevPts[r.id]=r.pts});
   const rows=st.rows.filter(r=>r.pts>0);
   const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
   const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
@@ -1746,10 +1744,11 @@ async function tablaPng(){
     x.fillStyle=V('--muted');x.font=`600 26px ${BOD}`;x.fillText([otros,c.pot?'Pozo '+money(c.pot):''].filter(Boolean).join('   ·   '),W/2,y+180);
     y+=win;}
   // tabla
-  const cx={pos:P+44,name:P+96,mov:W-P-300,sum:W-P-200,pts:W-P-100,pj:W-P-24};
+  // columnas fijas: posición, jugador, puntos, partidas jugadas y plata ganada
+  const cx={pos:P+44,name:P+96,pts:W-P-330,pj:W-P-230,won:W-P-24};
   rr(P,y,W-2*P,70+rows.length*RH+20,22);x.fillStyle=V('--paper');x.fill();
   x.fillStyle=V('--muted');x.font=`500 22px ${NUM}`;x.textAlign='center';x.fillText('#',cx.pos,y+46);x.textAlign='left';x.fillText('JUGADOR',cx.name,y+46);
-  x.textAlign='right';if(last){const [,mm,dd]=last[1].date.split('-');x.fillText('EL '+(+dd)+'/'+(+mm),cx.sum,y+46)}x.fillText('PTS',cx.pts,y+46);x.fillText('PJ',cx.pj,y+46);
+  x.textAlign='right';x.fillText('PTS',cx.pts,y+46);x.fillText('PJ',cx.pj,y+46);x.fillText('GANADO',cx.won,y+46);
   y+=70;
   rows.forEach((r,i)=>{const ty=y+i*RH,gan=last&&r.id===last[1].result.p1;
     if(gan){rr(P+10,ty+4,W-2*P-20,RH-8,12);x.fillStyle=V('--gold-soft');x.fill()}
@@ -1757,12 +1756,10 @@ async function tablaPng(){
     const b=ty+RH/2+11;
     x.fillStyle=i<3?V('--gold-2'):V('--muted');x.font=`600 30px ${NUM}`;x.textAlign='center';x.fillText(i+1,cx.pos,b);
     x.fillStyle=V('--ink');x.font=`${gan?700:600} 30px ${BOD}`;x.textAlign='left';
-    let nm=r.name;while(x.measureText(nm).width>cx.mov-cx.name-60&&nm.length>3)nm=nm.slice(0,-2)+'…';x.fillText(nm,cx.name,b);
-    if(last){const pp=prevPos[r.id],d=pp?pp-(i+1):0,s=r.pts-(prevPts[r.id]||0);
-      if(d){x.fillStyle=d>0?'#1F7A45':V('--felt');x.font=`600 22px ${NUM}`;x.textAlign='right';x.fillText((d>0?'▲ ':'▼ ')+Math.abs(d),cx.mov,b-2)}
-      if(s){x.fillStyle=V('--gold-2');x.font=`600 26px ${NUM}`;x.textAlign='right';x.fillText('+'+s,cx.sum,b)}}
+    let nm=r.name;while(x.measureText(nm).width>cx.pts-cx.name-80&&nm.length>3)nm=nm.slice(0,-2)+'…';x.fillText(nm,cx.name,b);
     x.fillStyle=V('--ink');x.font=`600 32px ${NUM}`;x.textAlign='right';x.fillText(r.pts,cx.pts,b);
     x.fillStyle=V('--muted');x.font=`500 26px ${NUM}`;x.fillText(r.pj,cx.pj,b);
+    x.fillStyle=V('--ink');x.font=`500 28px ${NUM}`;x.fillText(r.won?money(r.won):'',cx.won,b);
   });
   x.textAlign='center';x.fillStyle='rgba(255,246,236,.7)';x.font=`400 22px ${BOD}`;x.fillText(location.host||'poker',W/2,H-42);
   return new Promise(res=>cv.toBlob(res,'image/png'));
