@@ -1114,9 +1114,9 @@ const rebuyClosed=(ts,g)=>{const c=cutOf(g);
 // sin reloj, se puede eliminar desde la hora de inicio; con reloj, en Con rebuy recién cuando se cierra el rebuy
 const canKO=(g,ts)=>g.status!=='closed'&&(ts.started?(!isLibre(g)||rebuyClosed(ts,g)):Date.now()>=startAt(g));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
-// "Cebolla": el primero que queda afuera de los puntos (3º en Rápido, 4º en Con rebuy)
-const cebPlace=type=>T(type).pts.length+1;
-function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,T(g.type).pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});r.ceb=Object.keys(c.place).find(id=>c.place[id]===cebPlace(g.type))||'';return r}
+// "Cebolla": siempre el que sale 2º
+const cebPlace=()=>2;
+function resultFrom(g){const c=calc(g),r={};['p1','p2','p3'].slice(0,T(g.type).pts.length).forEach((k,i)=>{r[k]=Object.keys(c.place).find(id=>c.place[id]===i+1)||''});r.ceb=r.p2||'';return r}
 const stageName=ts=>ts.brk?'Break':'Nivel '+(ts.level+1);
 function nextLabel(g,ts){const n=nextStage(g,ts.t);return n.brk?`Arrancar break (${brkMin(g)} min)`:`Arrancar nivel ${n.level+1} · ${blind(n.level,g)}`}
 function ladder(g,ts){
@@ -1141,7 +1141,7 @@ function stats(type,noPrev,skip){
       if(isLibre(g))o.rb+=c.parts[id].rb||0;else if(c.parts[id].rq)o.rb++;
       if(c.parts[id].st==='come')o.ate++;
     }
-    if(res.ceb&&out[res.ceb])out[res.ceb].ceb++;
+    if(res.p2&&out[res.p2])out[res.p2].ceb++; // la cebolla es el 2º
     ['p1','p2','p3'].forEach((k,i)=>{const id=res[k];if(id&&out[id]&&t.pts[i]!=null){out[id][k]++;out[id].pts+=t.pts[i];out[id].won+=c.prizes[i]||0;}});
   }
   // Puntos y partidas ganadas de la liga anterior (solo cuentan en "Todos")
@@ -1455,9 +1455,9 @@ function vResult(gid,g,c){
   const t=T(g.type),res=g.result||{},closed=g.status==='closed';
   const keys=['p1','p2','p3'].slice(0,t.pts.length);
   const others=sortedPlayers().filter(([id,p])=>p.active!==false&&!c.playing.includes(id)).map(([id])=>id);
-  const all=[...keys,'ceb'];
+  const all=keys;
   const opts=(ids,k)=>ids.map(id=>`<option value="${id}" ${res[k]===id?'selected':''} ${all.some(o=>o!==k&&res[o]===id)?'disabled':''}>${esc(pname(id))}</option>`).join('');
-  const sel=(k,i)=>`<label><span class="label">${k==='ceb'?`🧅 Cebolla · ${cebPlace(g.type)}º, sin puntos`:`${i+1}º puesto · ${t.pts[i]} pts · ${money(c.prizes[i])}`}</span>
+  const sel=(k,i)=>`<label><span class="label">${i+1}º puesto${i===1?' 🧅':''} · ${t.pts[i]} pts · ${money(c.prizes[i])}</span>
     <select id="res-${k}" data-chg="pos" data-k="${k}" ${closed||!canFinish(g)?'disabled':''}><option value="">—</option>
     ${opts(c.playing,k)}${others.length?`<optgroup label="No anotados en la asistencia">${opts(others,k)}</optgroup>`:''}</select></label>`;
   const need=Math.min(keys.length,Math.max(c.playing.length,1));
@@ -1468,7 +1468,7 @@ function vResult(gid,g,c){
   return `<section class="card" data-suit="♣">
     <h2>Resultado</h2>
     ${shown.length?podium(keys.map((k,i)=>res[k]?{id:res[k],top:`${i+1}º`,val:money(c.prizes[i]),sub:t.pts[i]+' pts'}:null)):''}
-    <div class="fields">${keys.map(sel).join('')}${sel('ceb')}</div>
+    <div class="fields">${keys.map(sel).join('')}</div>
     <div class="row">
       ${closed?`<button class="btn" data-act="reopen">Reabrir partida</button>`:`<button class="btn gold ${armedClose?'armed':''}" data-act="closeGame" ${some&&canFinish(g)?'':'disabled'}>${armedClose?'Faltan puestos: ¿cerrar igual? Tocá de nuevo':'Cerrar partida y sumar puntos'}</button>`}
       ${isAdmin()&&(closed||canFinish(g))?`<button class="btn danger ${armedDel?'armed':''}" data-act="delGame">${armedDel?'¿Seguro? Tocá de nuevo para borrar':'Borrar partida'}</button>`:''}
@@ -1791,14 +1791,14 @@ function vStats(){
       .sort((a,b)=>b.avg-a.avg||b.pj-a.pj||a.name.localeCompare(b.name,'es'));
     top=rows.filter(r=>r.avg>0).slice(0,3);
     note=`Cada número está dividido por las partidas que jugó esa persona, así se compara a quien va siempre con quien va poco. No incluye la liga anterior, que no tiene partidas cargadas.`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r" title="Cebolla: primero sin puntos">🧅</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r" title="Cebolla: veces que salió 2º">🧅</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
     row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${pctOf(r.ceb,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
   }else{
     rows=st.rows.filter(r=>r.pj||r.active);
     top=rows.filter(r=>r.pts>0).slice(0,3);
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r" title="Cebolla: primero sin puntos">🧅</th><th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
-    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.ceb||''}</td><td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r" title="Cebolla: el que sale 2º">2º 🧅</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
+    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
   }
   const split=!per&&ui.statsType==='all';
   if(split){
@@ -1816,7 +1816,7 @@ function vStats(){
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
     ${(()=>{const cb=st.rows.filter(r=>r.ceb).sort((a,b)=>b.ceb-a.ceb||a.name.localeCompare(b.name,'es'));if(!cb.length)return '';const mx=cb[0].ceb,kings=cb.filter(r=>r.ceb===mx);
       return `<div class="ceb">🧅 <span>El más cebolla: <b>${kings.map(r=>esc(r.name)).join(', ')}</b> · ${mx} ${mx===1?'vez':'veces'}</span></div>`})()}
-    <p class="small muted">${st.games} partidas cerradas. ${note} 🧅 = cebolla, el primero que queda sin puntos (${typeKeys().map(k=>(T(k).pts.length+1)+'º en '+esc(T(k).name)).join(', ')}).</p>
+    <p class="small muted">${st.games} partidas cerradas. ${note} 🧅 = cebolla, el que sale 2º.</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
       <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td><span class="who">${avatar(r.id,26)}<span>${esc(r.name)}${ptag(r.id)}</span></span></td>${row(r)}</tr>`).join('')}</tbody>
@@ -2161,7 +2161,7 @@ function vInicio(){
   const medal=['🥇','🥈','🥉'];
   const past=`<section class="card" data-suit="♣"><h2>Partidos jugados</h2>
     ${played.length?`<div class="played">${played.map(([id,g])=>{const c=calc(g),r=g.result||{},closed=g.status==='closed';
-      const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}</span></span>`:'').join('')+(r.ceb&&r.p1?`<span class="pod" style="color:var(--muted)">🧅 <span class="nm">${esc(pname(r.ceb))}</span></span>`:'');
+      const pod=['p1','p2','p3'].map((k,i)=>r[k]?`<span class="pod">${medal[i]} ${avatar(r[k],22)}<span class="nm">${esc(pname(r[k]))}${k==='p2'?' 🧅':''}</span></span>`:'').join('');
       return `<button data-act="goGame" data-id="${id}">
         <span class="phd"><span class="badge ${tcls(g.type)}">${esc(T(g.type).name)}</span>${g.title?`<b class="gtitle sm" style="display:inline">${gTitle(g)}</b>`:''}<b>${fmtDate(g.date)}</b><span class="small muted">${c.playing.length} jug.</span><span class="num pot">${money(c.pot)}</span></span>
         ${pod?`<span class="pods">${pod}</span>`:`<span class="small" style="color:var(--red);font-weight:700">${closed?'Sin resultado cargado':'Falta cerrar: tocá para cargar los ganadores'}</span>`}
@@ -2467,7 +2467,7 @@ const CHG={
   gtext:el=>{const [gid]=currentGame();let v=el.value.trim();if(el.dataset.k==='map'&&v&&!safeUrl(v)){ui.err='El link tiene que empezar con https://';render();return}Store.update('games',gid,{[el.dataset.k]:v})},
   date:el=>{const [gid,g]=currentGame();if(canFinish(g))return;if(el.value)Store.update('games',gid,{date:el.value})},
   dealer:el=>{const [gid,g]=currentGame();const d=(g.dealers||[]).slice(0,3);d[+el.dataset.i]=el.value;Store.update('games',gid,{dealers:[0,1,2].map(i=>d[i]||'')})},
-  pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value},resultManual:true})},
+  pos:el=>{const [gid]=currentGame();Store.update('games',gid,{result:{[el.dataset.k]:el.value,...(el.dataset.k==='p2'?{ceb:el.value}:{})},resultManual:true})},
   me:el=>{if(isFB()){ui.pinFor=el.value||null;ui.pinErr=null;render();return}ui.me=el.value||null;try{ui.me?localStorage.setItem('poker.me',ui.me):localStorage.removeItem('poker.me')}catch{}render()},
   photo:async el=>{
     const f=el.files&&el.files[0];if(!f)return;
