@@ -1074,7 +1074,12 @@ const tooEarly=(g,ts)=>!ts.started&&Date.now()<startAt(g);
 // Una partida se puede terminar recién cuando empezó: se arrancó el reloj o ya pasó la hora programada.
 const canFinish=g=>tstate(g).started||Date.now()>=startAt(g);
 const startLabel=g=>g.date===today()?`Empieza a las ${g.time||'00:00'}`:`Empieza el ${fmtDate(g.date)}${g.time?' a las '+g.time:''}`;
-const rebuyClosed=(ts,g)=>{const c=cutOf(g);return ts.level>c||(ts.brk&&ts.level>=c)||(ts.level===c&&ts.done)};
+// El rebuy sigue abierto durante el break que viene justo después del nivel de corte, y cierra al terminar ese break.
+const rbConBreak=g=>brkMin(g)>0&&brkAt(g)===cutOf(g);
+const rbHasta=g=>rbConBreak(g)?'el break':'el '+blind(cutOf(g),g);
+const rebuyClosed=(ts,g)=>{const c=cutOf(g);
+  if(rbConBreak(g))return ts.level>c||(ts.brk&&ts.done);
+  return ts.level>c||(ts.brk&&ts.level>=c)||(ts.level===c&&ts.done)};
 // sin reloj, se puede eliminar desde la hora de inicio; con reloj, en Con rebuy recién cuando se cierra el rebuy
 const canKO=(g,ts)=>g.status!=='closed'&&(ts.started?(!isLibre(g)||rebuyClosed(ts,g)):Date.now()>=startAt(g));
 // resultado que se desprende de las eliminaciones (1º, 2º, 3º cuando ya se saben)
@@ -1087,8 +1092,8 @@ function ladder(g,ts){
   const vie=isLibre(g),hasBrk=brkMin(g)>0,CUT=cutOf(g),BA=brkAt(g);
   return blindsOf(g).map((b,i)=>{
     const cur=i===ts.level&&!ts.brk,past=i<ts.level||(i===ts.level&&ts.brk);
-    let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===CUT?'cut':''}">${b}-${b*2}</span>`;
-    if(i===BA&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>BA?'past':''}">Break ${brkMin(g)}'</span>`;
+    let h=`<span class="${past?'past':cur?'cur':''} ${vie&&i===CUT&&!rbConBreak(g)?'cut':''}">${b}-${b*2}</span>`;
+    if(i===BA&&hasBrk) h+=`<span class="brk ${ts.brk?'cur':ts.level>BA?'past':''} ${vie&&rbConBreak(g)?'cut':''}">Break ${brkMin(g)}'</span>`;
     return h;
   }).join('');
 }
@@ -1191,7 +1196,7 @@ function vNewGame(){
   const ty=ui.newType,date=ui.newDate||nextDow(T(ty).dow);
   const RBTXT={una:'1 recompra incluida en la entrada',no:'Sin recompra'};
   const opt=k=>{const y=T(k),c=tcls(k);return `<button class="opt ${c}" data-act="newType" data-v="${k}" data-pip="${c==='vie'?'♥':'♣'}" aria-pressed="${ty===k}">
-      <span class="badge ${c}">${esc(y.name)}</span><h3>Tipo ${DIAS[y.dow]}</h3><ul>${['Niveles de '+y.min+' min',y.rb==='libre'?'Rebuys hasta terminar '+blind(cutOf({type:k}),{type:k}):RBTXT[y.rb||'una'],'Puntos '+y.pts.join(' · '),'Premio '+y.split.join(' / ')].map(i=>`<li>${i}</li>`).join('')}</ul></button>`};
+      <span class="badge ${c}">${esc(y.name)}</span><h3>Tipo ${DIAS[y.dow]}</h3><ul>${['Niveles de '+y.min+' min',y.rb==='libre'?'Rebuys hasta terminar '+rbHasta({type:k}):RBTXT[y.rb||'una'],'Puntos '+y.pts.join(' · '),'Premio '+y.split.join(' / ')].map(i=>`<li>${i}</li>`).join('')}</ul></button>`};
   const keys=typeKeys().filter(k=>!soloVie()||k==='vie');
   return `<section class="card" data-suit="♠">
     <h2>Programar partida</h2>
@@ -1372,7 +1377,7 @@ function vKO(g,c,ts){
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Eliminaciones</h2><span class="badge gold">Quedan ${c.alive.length} de ${n}</span></div>
     ${closed?'':vAviso(g,c)}
-    ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${isLibre(g)?'cuando se cierra el rebuy (al terminar el '+blind(cutOf(g),g)+')':'cuando arranca el reloj'}.</p>`
+    ${closed?'':!on?`<p class="muted small" style="margin:0">Se habilita ${isLibre(g)?'cuando se cierra el rebuy (al terminar '+rbHasta(g)+')':'cuando arranca el reloj'}.</p>`
       :winner?`<div class="donemsg">🏆 Ganó ${esc(pname(winner))}. Revisá el resultado y cerrá la partida.</div>`
       :`<p class="muted small" style="margin:0">Tocá dos veces a quien queda afuera. El primero en caer queda ${n}º.</p>`}
     ${winner?'':`<div class="kolist">${chips}</div>`}
@@ -1428,7 +1433,7 @@ function vTimer(g,ts,big){
       ${locked?'<button class="btn gold" data-act="sound">🔔 Activar sonido</button>':''}
       <button class="btn" data-act="big">${big?'Salir (Esc)':'Proyectar'}</button>
     </div>`;
-  const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.level===cutOf(g)?'Último nivel con rebuy ('+blind(cutOf(g),g)+')':'Rebuy abierto hasta terminar '+blind(cutOf(g),g)}</div>`:'';
+  const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.brk?'Último momento para rebuy: cierra al terminar el break':ts.level===cutOf(g)&&!rbConBreak(g)?'Último nivel con rebuy ('+blind(cutOf(g),g)+')':'Rebuy abierto hasta terminar '+rbHasta(g)}</div>`:'';
   const doneMsg=ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · esperando para arrancar</div>`:'';
   const blindsNow=ts.brk?'Break':blind(ts.level,g);
   const nextBl=ts.brk?blind(ts.level+1,g):(nextStage(g,ts.t).brk?'Break':blind(ts.level+1,g));
@@ -1813,7 +1818,7 @@ function tourFields(tid,t){
             <label><span class="label">Hora de inicio</span><input type="time" id="tt-${tid}-${k}-time" value="${esc(y.time||'')}"></label>
             ${tf(k,'min','Minutos por nivel',y.min,'inputmode="numeric"')}
             <label><span class="label">Recompra</span><select class="rbsel" id="tt-${tid}-${k}-rb">${RBOPT.map(([v,l])=>`<option value="${v}" ${y.rb===v?'selected':''}>${l}</option>`).join('')}</select></label>
-            <label class="cutf"><span class="label">Rebuys hasta terminar el nivel</span><select id="tt-${tid}-${k}-cut">${B.map((b,j)=>`<option value="${j}" ${cut===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
+            <label class="cutf"><span class="label">Rebuys hasta terminar el nivel (y el break, si va justo después)</span><select id="tt-${tid}-${k}-cut">${B.map((b,j)=>`<option value="${j}" ${cut===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
             <label><span class="label">Break</span><select class="brksel" id="tt-${tid}-${k}-brk">${[0,5,10,15,20,25,30].map(m=>`<option value="${m}" ${(y.brk==null?20:+y.brk)===m?'selected':''}>${m?m+' minutos':'Sin break'}</option>`).join('')}</select></label>
             <label class="brkatf"><span class="label">Break después del nivel</span><select id="tt-${tid}-${k}-brkat">${B.map((b,j)=>`<option value="${j}" ${(y.brkAt!=null?+y.brkAt:cut)===j?'selected':''}>Nivel ${j+1} · ${b}-${b*2}</option>`).join('')}</select></label>
             ${tf(k,'pts','Puntos por puesto (hasta 3, ej. 7,3,1)',y.pts.join(','))}
