@@ -462,7 +462,8 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .tctl:hover,.proj .tctl:focus-within,.proj .tctl.isdone{opacity:1}
 .proj .donemsg{font-size:clamp(16px,calc(1.9*var(--pw)),34px);align-self:flex-start;padding:calc(.5*var(--pw)) calc(1.2*var(--pw))}
 .proj .tctl .btn.go{font-size:clamp(16px,calc(1.6*var(--pw)),28px)}
-.proj{grid-template-columns:auto minmax(0,1fr)}
+.proj{grid-template-columns:minmax(0,1fr) min(calc((8 + var(--cols) * 17) * var(--pw)),60%)}
+.proj .pmain{justify-self:center;width:max-content;max-width:100%}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
 .proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
@@ -1502,11 +1503,13 @@ function renderBig(){
   const tag=x=>vie
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
-  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
+  // el panel de los nombres crece según cuántas columnas hay (1, 2 o 3 mesas), no ocupa siempre todo el ancho
+  const ncols=tablesOf(g).length>1?tablesOf(g).length:(c.playing.length>8?2:1);
+  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" style="--cols:${ncols}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
       <div class="ptop">
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
-      <button class="plvl" data-act="lvlOpen" title="Cambiar de nivel"><div class="plab">${ts.brk?'Break':'Nivel '+(ts.level+1)} · ${ts.brk?brkMin(g):+g.levelMin||t.min} min <span class="caret">${ui.lvlOpen?'▴':'▾'}</span></div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></button>
+      <button class="plvl" data-act="lvlOpen" title="Cambiar de nivel"><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></button>
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
       </div>
       <div class="pmoney">
