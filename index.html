@@ -1812,7 +1812,6 @@ function vStats(){
     <div class="gamepick">${tabs}</div>
     <div class="gamepick">${modes}</div>
     ${top.length?podium(top.map((r,i)=>({id:r.id,top:`${i+1}º`,val:per?dec(r.avg):r.pts+' pts',sub:per?'pts/PJ · '+r.pj+' PJ':r.pj+' PJ'}))):''}
-    <p class="small muted">${st.games} partidas cerradas. ${note}</p>
     ${rows.length?`<div class="tw"><table class="num">
       <thead><tr>${head}</tr></thead>
       <tbody>${rows.map((r,i)=>`<tr${r.id===m?' style="background:var(--gold-soft)"':''}><td>${i+1}</td><td>${esc(r.name)}</td>${row(r)}</tr>`).join('')}</tbody>
