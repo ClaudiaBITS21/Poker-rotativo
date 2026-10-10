@@ -256,6 +256,19 @@ tfoot td{font-weight:700;border-bottom:0}
 .btn.ghost{background:transparent;color:var(--on-felt);border-color:rgba(222,173,110,.45)}
 .card .btn.go{min-height:48px}
 .kolist{display:flex;flex-wrap:wrap;gap:6px}
+.mover{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.mover[open]{gap:10px}
+.mover summary{cursor:pointer;font-weight:700;font-size:15px}
+.mover>*:not(summary){margin-top:10px}
+.mvcols{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:8px}
+.mvcol{display:flex;flex-direction:column;gap:4px;border:1px dashed transparent;border-radius:10px;padding:4px}
+.mvcol.drop{border-color:var(--gold-2);background:var(--gold-soft)}
+.mvhead{font-family:var(--serif);font-weight:800;font-size:16px;background:none;border:0;text-align:left;padding:4px 2px;color:var(--ink)}
+.mvhead:not(:disabled){color:var(--red);cursor:pointer}
+.mvhead:disabled{opacity:1}
+.mvp{display:flex;align-items:center;gap:6px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 8px;font-weight:600;font-size:14px;cursor:pointer;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.mvp b{color:var(--muted);min-width:16px;font-size:12px}
+.mvp.on{background:var(--rail);color:var(--gold-hi);border-color:var(--rail)}
 .kochip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 12px 3px 3px;font-weight:600;font-size:14px;min-height:34px}
 .kochip:hover:not(:disabled){border-color:var(--red)}
 .kochip.armed{background:var(--red);border-color:var(--red);color:#fff}
@@ -1326,7 +1339,7 @@ const nMesas=n=>n<=MESA_CAP[0]?1:n<=MESA_CAP[0]+MESA_CAP[1]?2:3;
 const mesasAll=g=>MKEYS.map(k=>(g.tables?.[k]||[]).slice());
 const tablesOf=g=>mesasAll(g).filter(t=>t.some(Boolean));
 const isBtn=(g,id)=>!!id&&MKEYS.some(k=>g.btn?.[k]===id);
-const MESA_FINAL=9; // se rompe una mesa cuando los que siguen entran en una mesa menos (de a 9 por mesa)
+const MESA_FINAL=10; // con 10 o menos en juego se arma la mesa final; antes, se rompe una mesa cuando entran en una menos (de a 10)
 // Qué hay que hacer con las mesas según quiénes siguen en juego: equilibrar, juntar (romper una mesa) o nada.
 function mesaAviso(g,c){
   if(g.status==='closed')return null;
@@ -1342,7 +1355,7 @@ function vAviso(g,c){
   const av=mesaAviso(g,c),msg=ui.moveMsg&&ui.moveMsg.g===g.createdAt?`<div class="donemsg">${esc(ui.moveMsg.t)}</div>`:'';
   if(!av)return msg;
   if(av.tipo==='juntar')return msg+(av.final
-    ?`<div class="aviso"><b>Mesa final:</b> quedan ${av.n} en juego. Se juntan todos en una mesa.<button class="btn gold" data-act="mesaJuntar">Juntar en una mesa</button></div>`
+    ?`<div class="aviso"><b>Mesa final:</b> quedan ${av.n} en juego. Se juntan todos en una mesa, con asientos y dealer sorteados de nuevo.<button class="btn gold ${ui.armed==='mesaFinal'?'armed':''}" data-act="mesaFinal">${ui.armed==='mesaFinal'?'¿Armar la mesa final? Tocá otra vez':'Mesa final'}</button></div>`
     :`<div class="aviso"><b>Romper una mesa:</b> quedan ${av.n} en juego y entran en una mesa menos. Los de la Mesa ${av.rompe} se reparten en las otras.<button class="btn gold" data-act="mesaJuntar">Romper la Mesa ${av.rompe}</button></div>`);
   return msg+`<div class="aviso"><b>Equilibrar mesas:</b> ${av.cuentas}. Pasa un jugador de la Mesa ${av.de} a la Mesa ${av.a}.<button class="btn gold" data-act="mesaPasar">Sortear quién pasa</button></div>`;
 }
@@ -1399,9 +1412,45 @@ function vKO(g,c,ts){
       :winner?`<div class="donemsg">🏆 Ganó ${esc(pname(winner))}. Revisá el resultado y cerrá la partida.</div>`
       :`<p class="muted small" style="margin:0">Tocá dos veces a quien queda afuera. El primero en caer queda ${n}º.</p>`}
     ${winner?'':`<div class="kolist">${chips}</div>`}
+    ${closed||winner?'':vMover(g,c)}
     ${standing.length?`<ol class="kos">${standing.map(id=>`<li class="${c.place[id]<=T(g.type).pts.length?'pod':''}"><b class="num">${c.place[id]}º</b>${avatar(id,26)}<span class="nm">${esc(pname(id))}</span>${c.place[id]===1?'<span class="small muted">ganador</span>':closed?'':`<button class="btn undo" data-act="unko" data-pid="${id}" title="Vuelve a estar en juego">↩ Volver</button>`}</li>`).join('')}</ol>`:''}
   </section>`;
 }
+// Mover jugadores entre mesas durante el juego: tocás a uno y después la mesa a la que va (en la compu también se arrastra).
+// Con 10 o menos en juego, "Mesa final" junta a todos en una mesa y sortea de nuevo asientos y dealer.
+function vMover(g,c){
+  const M=mesasAll(g),usadas=M.map((t,i)=>i).filter(i=>M[i].some(id=>id&&c.alive.includes(id)));
+  if(!usadas.length)return '';
+  const sel=ui.mvSel&&c.alive.includes(ui.mvSel)?ui.mvSel:null,de=sel?M.findIndex(t=>t.includes(sel)):-1;
+  const destinos=usadas.length>1?usadas:[];
+  const col=i=>`<div class="mvcol ${sel&&i!==de?'drop':''}" data-mesa="${i}">
+      <button class="mvhead" data-act="mvTo" data-v="${i}" ${sel&&i!==de?'':'disabled'}>${sel&&i!==de?'→ ':''}Mesa ${i+1} · ${M[i].filter(id=>id&&c.alive.includes(id)).length}</button>
+      ${M[i].map((id,s)=>id&&c.alive.includes(id)?`<button class="mvp ${sel===id?'on':''}" ${destinos.length?'draggable="true" data-act="mvSel"':'tabindex="-1"'} data-pid="${id}"><b class="num">${s+1}</b>${esc(pname(id))}${isBtn(g,id)?' <span class="dbtn">D</span>':''}</button>`:'').join('')}
+    </div>`;
+  const fin=c.alive.length<=MESA_FINAL&&usadas.length>2; // con 2 mesas el botón ya aparece en el aviso de arriba
+  return `<details class="mover" ${ui.mvOpen||sel?'open':''}><summary data-act="mvOpen">${usadas.length>1?'Mesas: mover jugadores':'Mesa final'}</summary>
+    ${destinos.length?`<p class="small muted" style="margin:0">${sel?`Tocá la mesa a la que pasa <b>${esc(pname(sel))}</b>.`:'Tocá a un jugador y después la mesa a la que pasa. En la compu también lo podés arrastrar.'}</p>
+    <div class="mvcols" style="--n:${usadas.length}">${usadas.map(col).join('')}</div>`:`<div class="mvcols" style="--n:1">${col(usadas[0])}</div>`}
+    <div class="row" style="gap:8px">${fin?`<button class="btn gold ${ui.armed==='mesaFinal'?'armed':''}" data-act="mesaFinal">${ui.armed==='mesaFinal'?'¿Armar la mesa final? Tocá otra vez':'Mesa final'}</button>`:''}
+      <button class="btn ${ui.armed==='redealer'?'armed':''}" data-act="redealer">${ui.armed==='redealer'?'¿Sortear el dealer? Tocá otra vez':'Sortear dealer (D)'}</button></div>
+  </details>`;
+}
+function moverA(pid,dest){
+  const [gid,g]=currentGame(),c=calc(g),M=mesasAll(g),de=M.findIndex(t=>t.includes(pid));
+  if(de<0||de===dest){render();return}
+  const t=M[dest],libre=t.findIndex((id,i)=>i>0&&!id),ti=libre>=0?libre:Math.max(t.length,1);
+  M[de][M[de].indexOf(pid)]='';t[ti]=pid;
+  const btn={...(g.btn||{})},kd=MKEYS[de];
+  // si se va el que tenía la D, se sortea otro dealer en la mesa que deja
+  if(btn[kd]===pid){const v=M[de].filter(id=>id&&c.alive.includes(id));btn[kd]=v.length?v[rnd(v.length)]:''}
+  ui.moveMsg={g:g.createdAt,t:`${pname(pid)} pasa a la Mesa ${dest+1}, asiento ${ti+1}.`};
+  Store.update('games',gid,{tables:Object.fromEntries(MKEYS.map((k,i)=>[k,M[i]])),btn});
+}
+// arrastrar en la compu
+document.addEventListener('dragstart',e=>{const b=e.target.closest&&e.target.closest('.mvp');if(!b)return;ui.mvDrag=b.dataset.pid;e.dataTransfer.setData('text/plain',b.dataset.pid)});
+document.addEventListener('dragover',e=>{if(ui.mvDrag&&e.target.closest&&e.target.closest('.mvcol'))e.preventDefault()});
+document.addEventListener('drop',e=>{const col=e.target.closest&&e.target.closest('.mvcol');if(!col||!ui.mvDrag)return;e.preventDefault();const pid=ui.mvDrag;ui.mvDrag=null;ui.mvSel=null;moverA(pid,+col.dataset.mesa)});
+document.addEventListener('dragend',()=>{ui.mvDrag=null});
 function vResult(gid,g,c){
   const t=T(g.type),res=g.result||{},closed=g.status==='closed';
   const keys=['p1','p2','p3'].slice(0,t.pts.length);
@@ -2303,6 +2352,22 @@ const ACT={
       lugares.push(`${pname(pid)} a la Mesa ${dest+1}, asiento ${ti+1}`)}
     ui.moveMsg={g:g.createdAt,t:`${av.final?'Mesa final.':'Se rompió la Mesa '+av.rompe+'.'} ${lugares.join('; ')}.`};
     Store.update('games',gid,{tables:Object.fromEntries(MKEYS.map((k,i)=>[k,M[i]]))});
+  },
+  mvOpen:(d,el,e)=>{e.preventDefault();ui.mvOpen=!ui.mvOpen;if(!ui.mvOpen)ui.mvSel=null;render()},
+  mvSel:d=>{ui.mvSel=ui.mvSel===d.pid?null:d.pid;ui.mvOpen=true;render()},
+  mvTo:d=>{const pid=ui.mvSel;ui.mvSel=null;if(pid)moverA(pid,+d.v);else render()},
+  mesaFinal:()=>{
+    if(ui.armed!=='mesaFinal'){arm('mesaFinal');return}ui.armed=null;
+    const [gid,g]=currentGame(),c=calc(g),m1=shuffle(c.alive),bt=m1[rnd(m1.length)];
+    ui.moveMsg={g:g.createdAt,t:`Mesa final: ${m1.map((id,i)=>`${i+1} ${pname(id)}`).join(', ')}. Dealer: ${pname(bt)}.`};ui.mvSel=null;
+    Store.update('games',gid,{tables:{m1,m2:[],m3:[]},btn:{m1:bt,m2:'',m3:''}});
+  },
+  redealer:()=>{
+    if(ui.armed!=='redealer'){arm('redealer');return}ui.armed=null;
+    const [gid,g]=currentGame(),c=calc(g),M=mesasAll(g),btn={};
+    MKEYS.forEach((k,i)=>{const v=M[i].filter(id=>id&&c.alive.includes(id));btn[k]=v.length?v[rnd(v.length)]:''});
+    ui.moveMsg={g:g.createdAt,t:'Dealer sorteado: '+MKEYS.map((k,i)=>btn[k]?(tablesOf(g).length>1?`Mesa ${i+1} ${pname(btn[k])}`:pname(btn[k])):'').filter(Boolean).join(', ')+'.'};
+    Store.update('games',gid,{btn});
   },
   mesas:()=>{
     const [gid,g]=currentGame();
