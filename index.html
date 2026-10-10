@@ -1720,7 +1720,7 @@ async function tablaPng(){
     .sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].closedAt||0)-(a[1].closedAt||0))[0];
   const prev=last?stats(type,false,last[0]):null,prevPos={},prevPts={};
   if(prev)prev.rows.forEach((r,i)=>{prevPos[r.id]=i+1;prevPts[r.id]=r.pts});
-  const rows=st.rows.filter(r=>r.pj||r.pts);
+  const rows=st.rows.filter(r=>r.pts>0);
   const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
   const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
   await Promise.all(['800 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
@@ -1785,14 +1785,14 @@ function vStats(){
   const mie=ui.statsType==='mie';
   let rows,top,note,head,row;
   if(per){
-    rows=st.rows.filter(r=>r.pj).map(r=>({...r,avg:r.pts/r.pj,pod:r.p1+r.p2+(mie?0:r.p3)}))
+    rows=st.rows.filter(r=>r.pj&&r.pts>0).map(r=>({...r,avg:r.pts/r.pj,pod:r.p1+r.p2+(mie?0:r.p3)}))
       .sort((a,b)=>b.avg-a.avg||b.pj-a.pj||a.name.localeCompare(b.name,'es'));
     top=rows.filter(r=>r.avg>0).slice(0,3);
     note=`Cada número está dividido por las partidas que jugó esa persona, así se compara a quien va siempre con quien va poco. No incluye la liga anterior, que no tiene partidas cargadas.`;
     head=`<th>#</th><th>Jugador</th><th class="r">Pts/PJ</th><th class="r">PJ</th><th class="r">Ganó</th><th class="r">Podio</th><th class="r">${mie?'Recompra':'Rebuys/PJ'}</th><th class="r">Ganado/PJ</th><th class="r">Pts</th>`;
     row=r=>`<td class="r"><b>${dec(r.avg)}</b></td><td class="r">${r.pj}</td><td class="r">${pctOf(r.p1,r.pj)}</td><td class="r">${pctOf(r.pod,r.pj)}</td><td class="r">${mie?pctOf(r.rb,r.pj):dec(r.rb/r.pj)}</td><td class="r">${money(r.won/r.pj)}</td><td class="r">${r.pts}</td>`;
   }else{
-    rows=st.rows.filter(r=>r.pj||r.active);
+    rows=st.rows.filter(r=>r.pts>0); // solo los que sumaron algún punto
     top=rows.filter(r=>r.pts>0).slice(0,3);
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
     head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
