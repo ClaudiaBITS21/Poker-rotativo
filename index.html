@@ -466,20 +466,18 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj{grid-template-columns:calc(49*var(--pw)) minmax(0,1fr)}
 .proj .pmain{justify-self:stretch;min-width:0;padding-left:calc(2.6*var(--pw));padding-right:calc(1.6*var(--pw))}
 .proj .pbl{gap:calc(3.4*var(--pw))}
-.proj .ptop .plab{margin-bottom:calc(.3*var(--ph))}
-.proj .pbl .pnext b{font-size:1.5em}
 .proj .pplayers.one{max-width:calc(30*var(--pw))}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
 .proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
-.proj .pmoney{margin-top:0;gap:calc(2*var(--ph));padding-top:calc(2*var(--ph))}
+.proj .pmoney{margin-top:0;gap:calc(2.6*var(--ph));padding-top:calc(2.4*var(--ph))}
 .proj .ppotw{display:flex;flex-direction:column;gap:calc(.8*var(--ph))}
 .proj .ppotl{display:flex;align-items:baseline;gap:calc(1.2*var(--pw))}
 .proj .prb{font-family:var(--num);font-weight:500;font-size:clamp(14px,min(calc(1.8*var(--pw)),calc(3.4*var(--ph))),34px);color:var(--pmut)}
 .proj .pprz div{padding:calc(1*var(--ph)) 0!important;gap:calc(.3*var(--ph))!important}
 .proj .pmoney .pprz{flex:none}
 .proj .pplayers{font-size:clamp(11px,min(calc(2*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),32px)!important}
-.proj .ptop{display:flex;flex-direction:column;gap:calc(4.5*var(--ph))}
+.proj .ptop{display:flex;flex-direction:column;gap:calc(6*var(--ph))}
 .proj .pplayers li:not(.ko){min-height:calc(78*var(--ph) / (var(--rows) + 2.6));padding:0!important;box-sizing:border-box}
 .proj.tres .pplayers{font-size:clamp(11px,min(calc(1.65*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),28px)!important}
 /* teléfono en vertical: la pantalla de juego se gira 90° y se ve apaisada igual */
@@ -1512,9 +1510,8 @@ function renderBig(){
   w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
       <div class="ptop">
-      <div><div class="plab">Reloj</div>
-      <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div></div>
-      <button class="plvl" data-act="lvlOpen" title="Cambiar de nivel"><div class="pbl"><div><div class="plab">Nivel</div><div class="blinds">${blindsNow}</div></div><div><div class="plab">Próximo nivel</div><div class="pnext"><b>${nextBl}</b></div></div></div></button>
+      <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
+      <button class="plvl" data-act="lvlOpen" title="Cambiar de nivel"><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></button>
       ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
       </div>
       <div class="pmoney">
