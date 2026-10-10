@@ -1525,7 +1525,7 @@ function vPlayersBig(g,c,players,tag){
   if(!players.length)return '<ul class="pplayers one"><li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li></ul>';
   const by=Object.fromEntries(players.map(x=>[x.id,x])),M=mesasAll(g),usadas=M.map((t,i)=>i).filter(i=>M[i].some(Boolean)),dos=usadas.length>1;
   // con varias mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
-  const tg=!dos?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
+  const tg=!dos&&!players.some(x=>x.p.ko)?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
   const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
     :`<li>${avatar(x.id,28)}<span class="nm">${esc(x.name)}</span>${x.pl===1?'<span class="ptag used" style="background:var(--gold);color:var(--ink)">🏆 1º</span>':tg(x)}</li>`;
   // los que siguen, ordenados por cantidad de rebuys (más arriba el que más hizo)
@@ -1534,7 +1534,11 @@ function vPlayersBig(g,c,players,tag){
     return `<ul class="pplayers ${one?'one':''}">${vivos.map(li).join('')}${kos.map(li).join('')}</ul>`};
   const sentado=new Set(),cols=usadas.map(i=>M[i].filter(id=>by[id]&&!sentado.has(id)&&sentado.add(id)).map(id=>by[id]));
   const sueltos=players.filter(x=>!sentado.has(x.id));
-  if(!dos)return ul(cols.length?[...cols[0],...sueltos]:players,players.length<=6);
+  if(!dos){const xs=cols.length?[...cols[0],...sueltos]:players,kos=xs.filter(x=>x.p.ko);
+    // una sola mesa (la final) con eliminados: en una columna los que siguen y en la otra las salidas
+    if(kos.length){const viv=xs.filter(x=>!x.p.ko);
+      return `<div class="pmesas" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><div class="plab">${cols.length?'Mesa final':'En juego'} · ${viv.length}</div>${ul(viv,true)}</div><div><div class="plab">Salidas · ${kos.length}</div>${ul(kos,true)}</div></div>`}
+    return ul(xs,players.length<=6)}
   cols[0].push(...sueltos);
   const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i+1} · ${n||'cerrada'}</div>`};
   return `<div class="pmesas ${cols.length>2?'tres':''}" style="grid-template-columns:repeat(${cols.length},minmax(0,1fr))">${cols.map((xs,j)=>`<div>${head(usadas[j],xs)}${ul(xs,true)}</div>`).join('')}</div>`;
@@ -1570,9 +1574,9 @@ function renderBig(){
         <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
-    <aside class="pside" style="--rows:${Math.max(4,tablesOf(g).length>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
+    <aside class="pside" style="--rows:${Math.max(4,tablesOf(g).length>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):c.kos.length?Math.max(c.alive.length,Math.ceil(c.kos.length*.6)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
-      ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
+      ${tablesOf(g).length>1||c.kos.length?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
     </aside>
     ${ui.lvlOpen?`<div class="lvlpick" aria-label="Niveles">${lvlPick(g,ts)}</div>`:''}
