@@ -284,6 +284,7 @@ tfoot td{font-weight:700;border-bottom:0}
 .proj .pmesas .pplayers li:not(.ko){padding:calc(.15*var(--pw)) 0}
 .proj .pmesas .pplayers .av{width:1.4em;height:1.4em}
 .proj .pmesas>div{display:flex;flex-direction:column;gap:calc(.3*var(--pw));min-width:0}
+.mesa li.mine{background:var(--gold-soft);border-radius:8px;margin-inline:-6px;padding:2px 6px}
 .seatpop .seatbig{display:flex;gap:20px;justify-content:center;font-size:22px;padding:6px 0}
 .seatpop .seatbig b{font-size:52px;color:var(--red);margin-left:6px;line-height:1}
 .dbtn{display:inline-grid;place-items:center;width:1.45em;height:1.45em;flex:none;border-radius:50%;background:#fff;color:#111;border:1px solid #999;font-family:var(--num);font-weight:700;font-size:.8em;box-shadow:0 1px 2px rgba(0,0,0,.3)}
@@ -295,6 +296,14 @@ tfoot td{font-weight:700;border-bottom:0}
 .edit label{display:flex;flex-direction:column;gap:4px;min-width:0}
 .edit .row{grid-column:1/-1}
 .mesas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.mesas.cols{grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:8px}
+.mesas.cols .mesa{padding:10px 8px;gap:6px}
+.mesas.cols h3{font-size:16px}
+.mesas.cols li{gap:5px;font-size:14px}
+.mesas.cols .seat{min-width:20px;height:20px;font-size:11px}
+.mesas.cols .badge{font-size:9px;padding:1px 5px}
+.mesas.cols .dbtn{font-size:.7em}
+.mimesa{background:var(--gold-soft);border-radius:10px;padding:8px 12px;font-size:15px}
 .mesa{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mesa ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .mesa li{display:flex;align-items:center;gap:8px;min-width:0}
@@ -434,6 +443,15 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .ptag.used{background:var(--red);color:#fff}
 .proj .ptag.free{color:var(--pmut);border:1px solid var(--pline)}
 .proj .ladder{grid-column:1/-1;padding-inline:calc(1*var(--pw))}
+.proj{touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.proj .clock{cursor:pointer}
+.proj .plvl{all:unset;cursor:pointer;color:inherit}
+.proj .plvl .caret{font-size:.7em;opacity:.7}
+.proj .lvlpick{position:absolute;left:calc(2.4*var(--pw));right:calc(2.4*var(--pw));bottom:calc(2*var(--pw));z-index:2;display:flex;flex-wrap:wrap;gap:calc(.5*var(--pw));padding:calc(1.2*var(--pw));background:rgba(20,6,4,.92);border:1px solid rgba(222,173,110,.4);border-radius:calc(1.4*var(--pw));box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.proj .lvlpick button{font-family:var(--num);font-size:clamp(13px,calc(1.3*var(--pw)),24px);padding:.25em .7em;border-radius:999px;border:1px solid var(--pline);background:rgba(0,0,0,.25);color:var(--pfg);cursor:pointer}
+.proj .lvlpick button.past{opacity:.5}
+.proj .lvlpick button.cur{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.proj .lvlpick button.armed{background:var(--red);border-color:var(--red);color:#fff}
 .proj .ladder span{font-size:clamp(12px,calc(1.25*var(--pw)),24px);opacity:.6}
 .proj .ladder span.cur{opacity:1}
 .proj .tctl{grid-column:1/-1;justify-content:center;opacity:.3;transition:opacity .2s}
@@ -558,7 +576,7 @@ const EMOS=['🦈','🐟','🃏','🎩','😎','🤠','👑','💎','🍀','🔥
 const S={players:{},games:{},regalos:{},regpart:{}};
 const ui={heroOpen:(()=>{try{return localStorage.getItem('poker.hero')==='1'}catch{return false}})(),tab:'inicio',gameId:null,statsType:'all',big:location.hash==='#pantalla',newType:'mie',newDate:'',newTime:'',newReps:1,
   armed:null,editing:null,err:null,loaded:false,avFor:null,avDraft:null,avTab:'chip'};
-try{ui.sound=localStorage.getItem('poker.sound')!=='0'}catch{ui.sound=true}
+ui.sound=true; // la alarma está siempre encendida
 try{ui.me=localStorage.getItem('poker.me')||null}catch{ui.me=null}
 
 /* ---------- Firebase (versión pública en GitHub Pages, sin cuentas para los jugadores) ---------- */
@@ -1188,7 +1206,10 @@ function vGame(gid,g){
   const ts=tstate(g),rbClosed=isLibre(g)&&rebuyClosed(ts,g);
   // recompras y rebuys se anotan recién cuando arrancó la partida (reloj en marcha o ya es la hora de inicio)
   const preJuego=!closed&&!canFinish(g);
-  const list=rankedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
+  const list0=rankedPlayers().filter(([id,p])=>parts[id]?.st||(p.active!==false&&!(g.type==='mie'&&p.days==='vie')));
+  // arrancada la partida, solo los que juegan (así se encuentran rápido); "Ver todos" muestra al resto
+  const soloJuegan=!closed&&canFinish(g)&&!ui.verTodos&&c.playing.length>0;
+  const list=soloJuegan?list0.filter(([id])=>c.playing.includes(id)):list0;
   const rows=list.map(([id,p])=>{
     const pt=parts[id]||{},st=pt.st||'',plays=st==='juega'||st==='come';
     let extra='<span></span>';
@@ -1198,7 +1219,7 @@ function vGame(gid,g){
     const seg=[['no','✕'],['juega','♠'],['come','🍽']].map(([k,l])=>`<button data-act="st" data-pid="${id}" ${ajena?'disabled':''} data-v="${k}" class="${k==='come'?'emo ':''}${st===k?'on-'+k:''}" ${closed?'disabled':''} aria-pressed="${st===k}" aria-label="${ST[k]}">${l}</button>`).join('');
     return `<div class="arow ${id===m?'mine':''} ${st==='no'?'out':''}">${avBtn(id,30)}<span class="aname">${esc(p.name)}${ptag(id)}${id===m?' <span class="badge me">Vos</span>':''}${p.active===false?' <span class="small muted">(ret.)</span>':''}</span>${extra}<div class="aseg">${seg}</div></div>`;
   }).join('');
-  const pending=list.filter(([id])=>!parts[id]?.st).length;
+  const pending=list0.filter(([id])=>!parts[id]?.st).length,ocultos=list0.length-list.length;
 
   return `
   <section class="card head" data-suit="♦">
@@ -1221,7 +1242,7 @@ function vGame(gid,g){
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[2],String(c.playing.length))}</span>`}<span class="label">Entraron</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[3],String(c.alive.length))}</span>`}<span class="label">Quedan</span></div>
       <div class="pchip">${`<span class="av">${chipSvg(CHIPC[9],String(c.eaters.length))}</span>`}<span class="label">Comen</span></div>
-      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[0],String(c.rebuys))}</span>`}<span class="label">${isLibre(g)?'Rebuys':'Recompras'}</span></div>
+      <div class="pchip">${`<span class="av">${chipSvg(CHIPC[0],String(c.rebuys))}</span>`}<span class="label">${isLibre(g)?(c.rebuys===1?'Rebuy':'Rebuys'):(c.rebuys===1?'Recompra':'Recompras')}</span></div>
       <div class="plaque"><span class="label">Pozo</span><b class="num">${money(c.pot)}</b></div>
     </div>
   </section>
@@ -1230,14 +1251,17 @@ function vGame(gid,g){
 
   ${c.playing.length?vKO(g,c,ts):''}
 
+  ${tablesOf(g).length?vMesas(g,c):''}
+
   <section class="card r" data-suit="♥">
     <div class="row spread"><h2>Asistencia</h2><span class="row" style="gap:8px"><span class="small muted">${pending?pending+' sin responder':'Todos respondieron'}</span>${closed?'':`<button class="btn mini" data-act="addPToggle">${ui.addingP?'Cerrar':'＋ Jugador'}</button>`}</span></div>
     ${ui.addingP&&!closed?`<form class="row" data-form="addPlayerGame"><input type="text" id="npg-name" placeholder="Nombre del jugador nuevo" autocomplete="off" style="flex:1;min-width:160px"><button class="btn pri" type="submit">Agregar${isFB()&&!isAdmin()?'':' y anotar'}</button></form>`:''}
     <div class="alegend"><span><b>✕</b> no va</span><span><b>♠</b> juega</span><span><b>🍽</b> juega y come</span>${isUna(g)?'<span><b>R</b> recompra disponible · <b style="color:var(--red)">R✓</b> ya la usó</span>':isLibre(g)?'<span><b>− +</b> rebuys</span>':''}${preJuego&&rbm(g)!=='no'?`<span class="muted">${isLibre(g)?'Los rebuys':'Las recompras'} se anotan cuando arranca la partida</span>`:''}</div>
     ${list.length?`<div class="alist">${rows}</div>`:`<p class="empty">No hay jugadores. Agregalos en <b>Jugadores</b>.</p>`}
+    ${!closed&&canFinish(g)&&(ocultos||ui.verTodos)?`<button class="btn mini" data-act="verTodos" style="align-self:flex-start">${ui.verTodos?'Mostrar solo los que juegan':'Ver todos ('+ocultos+' más)'}</button>`:''}
   </section>
 
-  ${vMesas(g,c)}
+  ${tablesOf(g).length?'':vMesas(g,c)}
 
   <section class="card r" data-suit="♦">
     <h2>Cuentas</h2>
@@ -1317,7 +1341,9 @@ function vMesas(g,c){
   const sel=i=>`<label><span class="label">${k>1?'Reparte en la Mesa '+(i+1)+' (opcional)':'Reparte (opcional)'}</span><select id="dl-${i}" data-chg="dealer" data-i="${i}" ${closed?'disabled':''}><option value="">—</option>
     ${c.playing.slice().sort((a,b)=>pname(a).localeCompare(pname(b),'es')).map(id=>`<option value="${id}" ${dl[i]===id?'selected':''} ${dl.some((x,j)=>j!==i&&x===id)?'disabled':''}>${esc(pname(id))}</option>`).join('')}</select></label>`;
   const armed=ui.armed==='mesas',sz=mesaSizes(n,k);
-  const list=(t,i)=>{if(!t.some(Boolean))return '';const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+' en juego':'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''}"><b class="seat num" title="Asiento">${s+1}</b>${avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?'<span class="badge gold">Reparte</span>':''}</li>`).join('')}</ol></div>`};
+  const yo=me(),cols=all.filter(t=>t.some(Boolean)).length;
+  const list=(t,i)=>{if(!t.some(Boolean))return '';const vivos=t.filter(id=>id&&c.alive.includes(id)).length;return `<div class="mesa ${vivos?'':'cerrada'}"><h3>Mesa ${i+1} <span class="small muted" style="font-family:var(--body);font-weight:600">${vivos?vivos+(cols>1?'':' en juego'):'cerrada'}</span></h3><ol>${t.map((id,s)=>!id?'':`<li class="${c.kos.includes(id)?'out':''} ${id===yo?'mine':''}"><b class="seat num" title="Asiento">${s+1}</b>${cols>1?'':avatar(id,24)}<span class="nm">${esc(pname(id))}</span>${isBtn(g,id)?'<span class="dbtn" title="Dealer">D</span>':''}${s===0?`<span class="badge gold" title="Reparte">${cols>1?'Rep.':'Reparte'}</span>`:''}</li>`).join('')}</ol></div>`};
+  const mio=yo&&all.findIndex(t=>t.includes(yo));
   return `<section class="card" data-suit="♠">
     <div class="row spread"><h2>Mesas</h2><span class="badge gold">${n} jugadores · ${k===1?'1 mesa':k+' mesas'}</span></div>
     <p class="small muted" style="margin:0">La Mesa 1 es para ${MESA_CAP[0]} y las otras para ${MESA_CAP[1]}: se agrega una mesa cuando ya no entran. ${k>1?`Hoy son ${k} mesas de ${sz.join(', ')}.`:''} El número es el asiento: el 1 reparte (si no elegís quién, se sortea) y del 2 en adelante se sortea.</p>
@@ -1325,7 +1351,8 @@ function vMesas(g,c){
     ${closed?'':`<div class="row"><button class="btn ${tables.length?'':'gold'} ${armed?'armed':''}" data-act="mesas">${armed?'¿Sortear de nuevo? Tocá otra vez':tables.length?'Volver a sortear':'Sortear mesas'}</button></div>`}
     ${vAviso(g,c)}
     ${stale?`<div class="err">Cambió la asistencia desde el sorteo${missing.length?': '+missing.map(pname).map(esc).join(', ')+' sin mesa':''}. Volvé a sortear.</div>`:''}
-    ${tables.length?`<div class="mesas">${all.map(list).join('')}</div>`:''}
+    ${tables.length&&mio>=0?`<div class="mimesa">Estás en ${cols>1?`la <b>Mesa ${mio+1}</b>, `:''}asiento <b>${all[mio].indexOf(yo)+1}</b>${all[mio][0]===yo?' · te toca repartir':''}</div>`:''}
+    ${tables.length?`<div class="mesas ${cols>1?'cols':''}" style="--n:${cols}">${all.map(list).join('')}</div>`:''}
   </section>`;
 }
 function vKO(g,c,ts){
@@ -1392,7 +1419,7 @@ function vTimer(g,ts,big){
       <button class="btn icon" data-act="tnext" aria-label="Etapa siguiente">⏭</button>
       <button class="btn" data-act="trestart" title="Vuelve el reloj de esta etapa al principio">↺ Reiniciar</button>
       ${big?'':`<button class="btn ${ui.armed==='treset'?'armed':''}" data-act="treset">${ui.armed==='treset'?'¿Reset?':'Reset'}</button>`}
-      <button class="btn ${locked?'gold':''}" data-act="sound" aria-pressed="${ui.sound}">${!ui.sound?'🔕':locked?'🔔 Activar sonido':'🔔'}</button>
+      ${locked?'<button class="btn gold" data-act="sound">🔔 Activar sonido</button>':''}
       <button class="btn" data-act="big">${big?'Salir (Esc)':'Proyectar'}</button>
     </div>`;
   const rb=vie?`<div class="rebuyst ${rbClosed?'closed':''}">${rbClosed?'Rebuy cerrado':ts.level===cutOf(g)?'Último nivel con rebuy ('+blind(cutOf(g),g)+')':'Rebuy abierto hasta terminar '+blind(cutOf(g),g)}</div>`:'';
@@ -1432,12 +1459,18 @@ function vPlayersBig(g,c,players,tag){
   const head=(i,xs)=>{const n=xs.filter(x=>!x.p.ko).length;return `<div class="plab">Mesa ${i+1} · ${n||'cerrada'}</div>`};
   return `<div class="pmesas ${cols.length>2?'tres':''}" style="grid-template-columns:repeat(${cols.length},minmax(0,1fr))">${cols.map((xs,j)=>`<div>${head(usadas[j],xs)}${ul(xs,true)}</div>`).join('')}</div>`;
 }
+// Lista de niveles de la pantalla de juego: tocando uno (y confirmando) se salta a ese nivel
+function lvlPick(g,ts){
+  const st=[];blindsOf(g).forEach((b,i)=>{st.push({level:i,brk:false,l:`${i+1} · ${blind(i,g)}`});if(i===brkAt(g)&&brkMin(g)>0)st.push({level:i,brk:true,l:`Break ${brkMin(g)}'`})});
+  return st.map(x=>{const k='lvl-'+x.level+(x.brk?'b':''),cur=x.level===ts.level&&x.brk===ts.brk,past=x.level<ts.level||(x.level===ts.level&&!x.brk&&ts.brk);
+    return `<button class="${cur?'cur':past?'past':''} ${ui.armed===k?'armed':''}" data-act="goLvl" data-v="${x.level}" data-b="${x.brk?1:''}" ${cur?'disabled':''}>${ui.armed===k?'¿Ir a '+x.l+'?':x.l}</button>`}).join('');
+}
 function renderBig(){
   const w=$('#bigwrap');
   if(Store.mode==='blocked'){w.innerHTML='';return}
   const [,g]=ui.big?currentGame():[];
   if(!ui.big){w.innerHTML='';return}
-  if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span> No hay partida programada</div><div class="tctl" style="opacity:1"><button class="btn" data-act="big">Salir</button></div></div>`;return}
+  if(!g){w.innerHTML=`<div class="proj" style="place-content:center;text-align:center;display:grid"><div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span> No hay partida programada</div><div class="plab">Doble toque para salir</div></div>`;return}
   const ts=tstate(g),t=T(g.type),c=calc(g),vie=isLibre(g),parts=g.parts||{};
   const {ctl,rb,clk,doneMsg,blindsNow,nextBl}=vTimer(g,ts,true);
   const players=c.playing.map(id=>({id,name:pname(id),p:c.parts[id],pl:c.place[id]})).sort((a,b)=>(a.pl||0)-(b.pl||0)||a.name.localeCompare(b.name,'es')).sort((a,b)=>(!!a.p.ko)-(!!b.p.ko));
@@ -1446,24 +1479,32 @@ function renderBig(){
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
-      <div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><span>· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min</span></div>
+      <div class="phead"><span class="brandp">Torneo ${esc(tourName())}</span><b>${t.name}</b><span>${fmtDate(g.date)}</span><button class="plvl" data-act="lvlOpen" title="Ver los niveles">· <b>${stageName(ts)}</b> · ${ts.brk?brkMin(g):+g.levelMin||t.min} min <span class="caret">${ui.lvlOpen?'▴':'▾'}</span></button></div>
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
       <div><div class="plab">${ts.brk?'Descanso':'Ciegas'}</div><div class="pbl"><div class="blinds">${blindsNow}</div><div class="pnext">Próximas <b>${nextBl}</b></div></div></div>
-      ${doneMsg||(ts.running?'':`<div class="plab" style="color:var(--gold)">${ts.started?'En pausa':'Esperando para empezar'}</div>`)}
-      ${ui.sound&&!audioOk()?'<div class="plab" style="color:var(--gold)">Tocá la pantalla una vez para activar la alarma</div>':''}
-      ${rb}
+      ${ts.done?`<div class="donemsg">Terminó ${ts.brk?'el break':'el nivel '+(ts.level+1)} · tocá el reloj para seguir</div>`:ts.running?'':`<div class="plab" style="color:var(--gold)">${tooEarly(g,ts)?startLabel(g):ts.started?'En pausa · tocá el reloj para seguir':'Tocá el reloj para empezar'}</div>`}
     </div>
     <aside class="pside">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
-      <div><div class="plab">Pozo · ${c.rebuys} ${vie?'rebuys':'recompras'}</div><div class="ppot num">${money(c.pot)}</div></div>
+      <div><div class="plab">Pozo · ${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')}</div><div class="ppot num">${money(c.pot)}</div></div>
       <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
       ${tablesOf(g).length>1?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
     </aside>
-    <div class="ladder" aria-label="Estructura de ciegas">${ladder(g,ts)}</div>
-    ${ctl}
+    ${ui.lvlOpen?`<div class="lvlpick" aria-label="Niveles">${lvlPick(g,ts)}</div>`:''}
   </div>`;
 }
+// Pantalla de juego sin botones: un toque en el reloj pausa / sigue (o arranca el nivel siguiente si terminó),
+// dos toques en el reloj preguntan si se reinicia el nivel, y dos toques fuera del reloj salen de la pantalla.
+let tapT=null,tapN=0,tapZ=null;
+function clockTap(){const [,g]=currentGame();if(!g)return;const ts=tstate(g);if(ts.done)ACT.tgo();else if(ts.running)ACT.tpause();else ACT.tplay()}
+document.addEventListener('click',e=>{
+  if(!ui.big||!e.target.closest('.proj')||e.target.closest('[data-act]'))return;
+  const z=e.target.closest('.clock')?'clock':'out';if(z!==tapZ){tapN=0;tapZ=z}
+  tapN++;clearTimeout(tapT);
+  if(tapN>=2){tapN=0;if(z==='clock'){if(confirm('¿Reiniciar el reloj de este nivel?'))ACT.trestart()}else{ui.lvlOpen=false;ACT.big()}return}
+  tapT=setTimeout(()=>{tapN=0;if(z==='clock')clockTap();else if(ui.lvlOpen){ui.lvlOpen=false;render()}},320);
+});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&ui.pinFor){ACT.pinClose();return}
   if(e.key==='Escape'&&ui.avFor){ACT.avClose();return}
@@ -1499,17 +1540,20 @@ function miLugar(){
       if(s>=0)return {gid,g,mesa:i+1,seat:s+1,t,dos:tablesOf(g).length>1,key:gid+':'+(i+1)+':'+(s+1)}}}
   return null;
 }
+// Ticket de mesa: hasta que arranca la partida aparece cada vez que se vuelve a la app (OK = por ahora;
+// "Ocultar" = no mostrarlo más para ese lugar). Ya arrancada, solo aparece si te cambian de lugar.
 function renderSeat(w){
   const L=miLugar();if(!L)return false;
-  let seen='';try{seen=localStorage.getItem('poker.seat.'+L.gid)||''}catch{}
-  if(seen===L.key||ui.seatOk===L.key)return false;
-  const otros=L.t.map((id,i)=>id&&id!==me()&&!L.g.parts?.[id]?.ko?`<li><b class="seat num">${i+1}</b>${avatar(id,22)}<span class="nm">${esc(pname(id))}</span>${isBtn(L.g,id)?'<span class="dbtn" title="Dealer">D</span>':''}</li>`:'').join('');
+  const ls=k=>{try{return localStorage.getItem(k)||''}catch{return ''}};
+  if(ls('poker.seathide.'+L.gid)===L.key||ui.seatOk===L.key)return false;
+  if(canFinish(L.g)&&ls('poker.seat.'+L.gid)===L.key)return false;
+  const fila=(id,i)=>id&&!L.g.parts?.[id]?.ko?`<li class="${id===me()?'mine':''}"><b class="seat num">${i+1}</b>${avatar(id,22)}<span class="nm">${esc(pname(id))}${id===me()?' <span class="badge me">Vos</span>':''}</span>${isBtn(L.g,id)?'<span class="dbtn" title="Dealer">D</span>':''}</li>`:'';
   w.innerHTML=`<div class="modal"><section class="card seatpop" data-suit="♠" role="dialog" aria-modal="true" aria-label="Tu lugar en la mesa">
     <h2>Tu lugar</h2>
     <div class="seatbig">${L.dos?`<span>Mesa <b class="num">${L.mesa}</b></span>`:''}<span>Asiento <b class="num">${L.seat}</b></span></div>
     ${L.seat===1?'<p style="margin:0">Te toca <b>repartir</b>.</p>':''}${isBtn(L.g,me())?'<p style="margin:0">Arrancás con el botón de dealer <span class="dbtn">D</span>.</p>':''}
-    ${otros?`<div class="label">En tu mesa</div><div class="mesa" style="border:0;padding:0"><ol>${otros}</ol></div>`:''}
-    <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="seatOk" data-v="${L.key}" data-gid="${L.gid}">OK</button></div>
+    <div class="label">${L.dos?'Mesa '+L.mesa:'La mesa'}</div><div class="mesa" style="border:0;padding:0"><ol>${L.t.map(fila).join('')}</ol></div>
+    <div class="row" style="justify-content:flex-end;gap:8px">${canFinish(L.g)?'':`<button class="btn" data-act="seatHide" data-v="${L.key}" data-gid="${L.gid}">Ocultar</button>`}<button class="btn pri" data-act="seatOk" data-v="${L.key}" data-gid="${L.gid}">OK</button></div>
   </section></div>`;
   return true;
 }
@@ -1565,11 +1609,11 @@ function vJugadores(){
           <label><span class="label">Nombre</span><input type="text" id="rn-${id}" value="${esc(p.name)}" autocomplete="off"></label>
           <label><span class="label">Mano favorita</span><input type="text" id="rh-${id}" value="${esc(p.hand||'')}" placeholder="Ej.: 44, K9, AKs" maxlength="6" autocomplete="off" style="text-transform:uppercase"></label>
           <label><span class="label">Cumpleaños</span><input type="text" id="rb-${id}" inputmode="numeric" data-mask="fecha" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" value="${p.bday?p.bday.split('-')[1]+'/'+p.bday.split('-')[0]+(p.byear?'/'+p.byear:''):''}"></label>
-          ${dosDias()?'':'<input type="hidden" id="rd-'+id+'" value="'+(p.days||'')+'">'}${!dosDias()?'':`<label><span class="label">Juega</span><select id="rd-${id}"><option value="">Miércoles y viernes</option><option value="vie" ${p.days==='vie'?'selected':''}>Solo viernes</option></select></label>`}
+          ${dosDias()&&isAdmin()?'':'<input type="hidden" id="rd-'+id+'" value="'+(p.days||'')+'">'}${!(dosDias()&&isAdmin())?'':`<label><span class="label">Juega</span><select id="rd-${id}"><option value="">Miércoles y viernes</option><option value="vie" ${p.days==='vie'?'selected':''}>Solo viernes</option></select></label>`}
           <label class="full"><span class="label">Alias de Mercado Pago</span><input type="text" id="rm-${id}" value="${esc(p.mp||'')}" placeholder="${editaMp(id)?'Para que te puedan pagar (ej. juan.perez.mp)':'Solo lo carga '+esc(p.name)+' con su PIN'}" maxlength="60" autocomplete="off" autocapitalize="none" spellcheck="false" ${editaMp(id)?'':'disabled'}></label>
           <label class="full"><span class="label">Frase típica</span><input type="text" id="rp-${id}" value="${esc(p.phrase||'')}" placeholder="Ej.: Nadie baja ganando" maxlength="60" autocomplete="off"></label>
           <div class="row"><button class="btn pri" type="submit">Guardar</button><button class="btn" type="button" data-act="editCancel">Cancelar</button></div></form>`
-        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${dosDias()&&p.days==='vie'?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${p.bday?'🎂 '+fmtBday(p.bday)+' · ':''}${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div>${p.mp?`<div class="small mpline">MP: <b>${esc(p.mp)}</b> <button class="btn mini" data-act="copyAlias" data-v="${esc(p.mp)}">${ui.copied===p.mp?'Copiado ✓':'Copiar'}</button></div>`:''}</div></div>`;
+        :`<div class="who">${avBtn(id,44)}<div class="pname">${esc(p.name)}${lock(id)}${isFB()&&esAdminPid(id)?' <span class="badge gold" style="font-size:10px">Admin</span>':''}${ptag(id)}${dosDias()&&p.days==='vie'&&isAdmin()?' <span class="badge vie" style="font-size:11px">Solo vie</span>':''}${id===m?' <span class="badge me">Vos</span>':''} ${p.active===false?'<span class="small muted">(retirado)</span>':''}<div class="small muted" style="font-weight:400">${p.bday?'🎂 '+fmtBday(p.bday)+' · ':''}${r.pj} jugadas · ${r.pts} pts · desde ${fmtDate(p.since)}</div>${p.mp?`<div class="small mpline">MP: <b>${esc(p.mp)}</b> <button class="btn mini" data-act="copyAlias" data-v="${esc(p.mp)}">${ui.copied===p.mp?'Copiado ✓':'Copiar'}</button></div>`:''}</div></div>`;
       if(ui.editing===id)return `<div class="prow editing">${name}</div>`;
       return `<div class="prow">${name}<div class="row">
         ${ui.editing===id?'':`<button class="btn" data-act="avOpen" data-pid="${id}">Avatar</button><button class="btn" data-act="edit" data-pid="${id}">Editar</button>`}
@@ -2076,7 +2120,7 @@ setInterval(async()=>{
 },1000);
 // una vez por minuto: si una partida entró en la hora previa al inicio, pasa a "en juego" sin recargar
 // al volver a la app (estaba en segundo plano), si quedó en Partidos, vuelve a llevarte a la mesa abierta
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&ui.tab==='inicio'&&ui.loaded){ui.autoGo=null;render()}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;ui.seatOk=null;if(ui.tab==='inicio'&&ui.loaded)ui.autoGo=null;render()});
 setInterval(()=>{if(ui.tab!=='inicio'||!ui.loaded)return;const v=(vigente()||[])[0]||null;if(v!==ui.lastVig){ui.lastVig=v;render()}},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render()});
 // Los navegadores no dejan sonar nada hasta que la persona toca la página:
@@ -2084,7 +2128,10 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 let actx=null;
 function audioOk(){return !!actx&&actx.state==='running'}
 function unlockAudio(){
-  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state!=='running')actx.resume().then(()=>tick(false)).catch(()=>{})}catch{}
+  try{if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();
+      // todo pasa por un compresor: suena lo más fuerte posible sin distorsionar
+      const cp=actx.createDynamicsCompressor();cp.threshold.value=-20;cp.knee.value=10;cp.ratio.value=8;const out=actx.createGain();out.gain.value=1.6;cp.connect(out).connect(actx.destination);actx.out=cp}
+    if(actx.state!=='running')actx.resume().then(()=>tick(false)).catch(()=>{})}catch{}
 }
 document.addEventListener('pointerdown',unlockAudio,true);
 document.addEventListener('keydown',unlockAudio,true);
@@ -2092,11 +2139,11 @@ function tone(freq,t0,len,vol,type){
   const o=actx.createOscillator(),gn=actx.createGain();
   o.type=type||'sine';o.frequency.value=freq;
   gn.gain.setValueAtTime(.0001,t0);gn.gain.exponentialRampToValueAtTime(vol,t0+.015);gn.gain.exponentialRampToValueAtTime(.0001,t0+len);
-  o.connect(gn).connect(actx.destination);o.start(t0);o.stop(t0+len+.05);
+  o.connect(gn).connect(actx.out||actx.destination);o.start(t0);o.stop(t0+len+.05);
 }
 function beep(n){
   if(!ui.sound||!audioOk())return;
-  try{for(let i=0;i<n;i++)tone(n>1?880:660,actx.currentTime+i*.35,.28,.5)}catch{}
+  try{for(let i=0;i<n;i++)tone(n>1?880:660,actx.currentTime+i*.35,.28,.9)}catch{}
   try{navigator.vibrate&&navigator.vibrate(150)}catch{}
 }
 function alarm(){
@@ -2107,7 +2154,7 @@ function alarm(){
     const t=actx.currentTime;
     for(let r=0;r<3;r++)for(let i=0;i<3;i++){
       const t0=t+r*1.3+i*.32;
-      tone(1320,t0,.28,.35,'square');tone(988,t0+.14,.3,.35,'triangle');
+      tone(1320,t0,.28,.8,'square');tone(988,t0+.14,.3,.8,'triangle');
     }
   }catch{}
 }
@@ -2179,7 +2226,7 @@ const ACT={
   tprev:()=>{const [gid,g]=currentGame(),ts=tstate(g),n=prevStage(g,ts.t);if(tooEarly(g,ts))return;setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:n.level,brk:n.brk})},
   trestart:()=>{const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:ts.level,brk:ts.brk})},
   treset:()=>{if(ui.armed!=='treset'){arm('treset');return}ui.armed=null;const [gid]=currentGame();setTimer(gid,{running:false,anchor:0,acc:0,level:0,brk:false})},
-  sound:()=>{unlockAudio();if(ui.sound&&!audioOk()){setTimeout(()=>{beep(1);render()},150);return}ui.sound=!ui.sound;try{localStorage.setItem('poker.sound',ui.sound?'1':'0')}catch{}if(ui.sound)setTimeout(()=>beep(1),150);render()},
+  sound:()=>{unlockAudio();setTimeout(()=>{beep(1);render()},150)},
   big:()=>{ui.big=!ui.big;try{history.replaceState(null,'',ui.big?'#pantalla':location.pathname+location.search)}catch{}if(ui.big){try{document.documentElement.requestFullscreen?.().then(()=>screen.orientation?.lock?.('landscape')).catch(()=>{})}catch{}}else{try{document.fullscreenElement&&document.exitFullscreen()}catch{}}render()},
   closeGame:()=>{
     {const [,g0]=currentGame();if(!canFinish(g0))return}
@@ -2234,7 +2281,12 @@ const ACT={
   editCancel:()=>{clearDrafts(document.querySelector('form[data-form="rename"]'));ui.editing=null;render()},
   addPToggle:()=>{ui.addingP=!ui.addingP;render();if(ui.addingP)setTimeout(()=>{const i=$('#npg-name');i&&i.focus()})},
   heroToggle:()=>{ui.heroOpen=!ui.heroOpen;try{localStorage.setItem('poker.hero',ui.heroOpen?'1':'0')}catch{}render()},
+  lvlOpen:()=>{ui.lvlOpen=!ui.lvlOpen;render()},
+  goLvl:d=>{const k='lvl-'+d.v+(d.b?'b':'');if(ui.armed!==k){arm(k);return}ui.armed=null;ui.lvlOpen=false;
+    const [gid,g]=currentGame(),ts=tstate(g);setTimer(gid,{running:ts.running,anchor:Date.now(),acc:0,level:+d.v,brk:!!d.b})},
+  verTodos:()=>{ui.verTodos=!ui.verTodos;render()},
   seatOk:d=>{ui.seatOk=d.v;try{localStorage.setItem('poker.seat.'+d.gid,d.v)}catch{}render()},
+  seatHide:d=>{ui.seatOk=d.v;try{localStorage.setItem('poker.seat.'+d.gid,d.v);localStorage.setItem('poker.seathide.'+d.gid,d.v)}catch{}render()},
   admAdd:()=>{const pid=(document.getElementById('adm-add')||{}).value;if(!pid)return;const pids=[...new Set([...(ui.adminPids||[]),pid])];
     FB.m.setDoc(FB.m.doc(FB.db,'config','admins'),{pids},{merge:true}).catch(fail)},
   admDel:d=>{if(!confirm('¿Quitarle los permisos de administrador a '+((ui.allPlayers||{})[d.pid]?.name||'este jugador')+'?'))return;
