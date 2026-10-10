@@ -1795,8 +1795,8 @@ function vStats(){
     rows=st.rows.filter(r=>r.pts>0); // solo los que sumaron algún punto
     top=rows.filter(r=>r.pts>0).slice(0,3);
     note=`Asistencia = partidas jugadas sobre las que hubo desde que se sumó.${rows.some(r=>r.prev)?' Los puntos y los 1º incluyen lo acumulado en la liga anterior.':''}`;
-    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Comió</th><th class="r">Ganado</th>`;
-    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.ate||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
+    head=`<th>#</th><th>Jugador</th><th class="r">Pts</th><th class="r">PJ</th><th class="r">Asist.</th><th class="r">1º</th><th class="r">2º</th>${mie?'':'<th class="r">3º</th>'}<th class="r">${mie?'Recompras':'Rebuys'}</th><th class="r">Ganado</th>`;
+    row=r=>`<td class="r"><b>${r.pts}</b></td><td class="r">${r.pj}</td><td class="r">${pct(r)}</td><td class="r">${r.p1||''}</td><td class="r">${r.p2||''}</td>${mie?'':`<td class="r">${r.p3||''}</td>`}<td class="r">${r.rb||''}</td><td class="r">${r.won?money(r.won):''}</td>`;
   }
   const split=!per&&ui.statsType==='all';
   if(split){
