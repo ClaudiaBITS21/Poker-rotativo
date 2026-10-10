@@ -463,8 +463,9 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .donemsg{font-size:clamp(16px,calc(1.9*var(--pw)),34px);align-self:flex-start;padding:calc(.5*var(--pw)) calc(1.2*var(--pw))}
 .proj .tctl .btn.go{font-size:clamp(16px,calc(1.6*var(--pw)),28px)}
 /* la columna del reloj y el pozo tiene siempre el mismo ancho y lugar; el resto es para los nombres */
-.proj{grid-template-columns:calc(44*var(--pw)) minmax(0,1fr)}
-.proj .pmain{justify-self:stretch;min-width:0}
+.proj{grid-template-columns:calc(49*var(--pw)) minmax(0,1fr)}
+.proj .pmain{justify-self:stretch;min-width:0;padding-left:calc(2.6*var(--pw));padding-right:calc(1.6*var(--pw))}
+.proj .pbl{gap:calc(3.4*var(--pw))}
 .proj .pplayers.one{max-width:calc(30*var(--pw))}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
