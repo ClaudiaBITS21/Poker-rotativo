@@ -1522,7 +1522,7 @@ function vTimer(g,ts,big){
 // Pantalla de juego: los que siguen arriba (por mesa si se sortearon) y los eliminados abajo, finitos, con su puesto
 function vPlayersBig(g,c,players,tag){
   if(!players.length)return '<ul class="pplayers one"><li><span class="nm" style="color:var(--pmut)">Nadie anotado todavía</span></li></ul>';
-  const by=Object.fromEntries(players.map(x=>[x.id,x])),M=mesasAll(g),usadas=M.map((t,i)=>i).filter(i=>M[i].some(Boolean)),dos=usadas.length>1;
+  const by=Object.fromEntries(players.map(x=>[x.id,x])),M=mesasAll(g),usadas=M.map((t,i)=>i).filter(i=>M[i].some(id=>id&&c.alive.includes(id))),dos=usadas.length>1; // solo mesas con gente en juego
   // con varias mesas no hay lugar: la recompra se muestra como R (libre) / R✓ (usada), los rebuys solo con el número
   const tg=!dos&&!players.some(x=>x.p.ko)?tag:x=>isLibre(g)?(x.p.rb?`<span class="ptag used num">${x.p.rb}</span>`:''):(x.p.rq?'<span class="ptag used">R✓</span>':'<span class="ptag free">R</span>');
   const li=x=>x.p.ko?`<li class="ko"><b class="num">${x.pl}º</b><span class="nm">${esc(x.name)}</span></li>`
@@ -1561,7 +1561,9 @@ function renderBig(){
     ?(x.p.rb?`<span class="ptag used num">${x.p.rb} ${x.p.rb===1?'rebuy':'rebuys'}</span>`:`<span class="ptag free">—</span>`)
     :(x.p.rq?`<span class="ptag used">Recompró</span>`:`<span class="ptag free">Disponible</span>`);
   // el panel de los nombres crece según cuántas columnas hay (1, 2 o 3 mesas), no ocupa siempre todo el ancho
-  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${tablesOf(g).length>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
+  // mesas que todavía tienen gente en juego (una mesa rota puede seguir guardando a sus eliminados)
+  const nviv=mesasAll(g).filter(t=>t.some(id=>id&&c.alive.includes(id))).length;
+  w.innerHTML=`<div class="proj ${ts.done?'isdone':''} ${nviv>2?'tres':''}" role="dialog" aria-label="Pantalla de juego">
     <div class="pmain">
       <div class="ptop">
       <div class="clock ${ts.done?'done':ts.rem<60000&&ts.running?'warn':''}" data-t="clock">${clk}</div>
@@ -1573,9 +1575,9 @@ function renderBig(){
         <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
       </div>
     </div>
-    <aside class="pside" style="--rows:${Math.max(4,tablesOf(g).length>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):c.kos.length?Math.max(c.alive.length,Math.ceil(c.kos.length*.6)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
+    <aside class="pside" style="--rows:${Math.max(4,nviv>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):c.kos.length?Math.max(c.alive.length,Math.ceil(c.kos.length*.6)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
       <div class="pcount num">Entraron <b>${c.playing.length}</b> · Quedan <b>${c.alive.length}</b></div>
-      ${tablesOf(g).length>1||c.kos.length?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
+      ${nviv>1||c.kos.length?'':`<div class="plab">${vie?'Rebuys por jugador':'Recompra incluida'}</div>`}
       ${vPlayersBig(g,c,players,tag)}
     </aside>
     ${ui.lvlOpen?`<div class="lvlpick" aria-label="Niveles">${lvlPick(g,ts)}</div>`:''}
