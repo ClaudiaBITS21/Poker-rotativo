@@ -92,7 +92,7 @@ button{cursor:pointer}
 .btn.armed{background:var(--red);border-color:var(--red);color:#fff}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn.icon{width:44px;padding:0;display:inline-grid;place-items:center}
-input[type=text],input[type=number],input[type=date],input[type=time],select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;min-height:40px;max-width:100%;min-width:0}
+input[type=text],input[type=url],input[type=number],input[type=date],input[type=time],select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;min-height:40px;max-width:100%;min-width:0}
 input[type=number]{width:120px}
 
 .badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--num);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:999px;white-space:nowrap}
@@ -1236,6 +1236,8 @@ function vNewGame(){
       <label><span class="label">Fecha</span><input type="date" id="nd-date" data-chg="nd" data-k="newDate" value="${date}"></label>
       <label><span class="label">Hora</span><input type="time" id="nd-time" data-chg="nd" data-k="newTime" value="${esc(ui.newTime||T(ty).time||'')}"></label>
       <label><span class="label">Repetir semanalmente</span><select id="nd-reps" data-chg="nd" data-k="newReps">${[1,2,3,4,6,8,12].map(n=>`<option value="${n}" ${+ui.newReps===n?'selected':''}>${n===1?'Solo esta fecha':n+' semanas'}</option>`).join('')}</select></label>
+      <label style="grid-column:1/-1"><span class="label">Dirección (si es en otro lado, cambiala)</span><input type="text" id="nd-place" data-chg="nd" data-k="newPlace" value="${esc(ui.newPlace??LUGAR.place)}" maxlength="120"></label>
+      <label style="grid-column:1/-1"><span class="label">Link de Google Maps</span><input type="url" id="nd-map" data-chg="nd" data-k="newMap" value="${esc(ui.newMap??LUGAR.map)}" placeholder="https://maps.app.goo.gl/…"></label>
     </div>
     <div class="row"><button class="btn ${tcls(ty)==='mie'?'pri':'vie'}" data-act="newGame">Programar ${+ui.newReps>1?ui.newReps+' partidas':'partida'} ${T(ty).name.toLowerCase()}</button>
       <span class="small muted">${fmtDate(date)}${+ui.newReps>1?' y las '+(ui.newReps-1)+' semanas siguientes':''}</span></div>
@@ -2270,20 +2272,22 @@ const ACT={
   newGame:async()=>{
     const type=ui.newType,prev=Object.values(S.games).filter(g=>g.type===type).sort((a,b)=>b.date.localeCompare(a.date))[0]||{};
     const start=ui.newDate||nextDow(T(type).dow),reps=+ui.newReps||1;
+    const place=(ui.newPlace??LUGAR.place).trim(),map=(ui.newMap??LUGAR.map).trim();
+    if(map&&!safeUrl(map)){ui.err='El link de Maps tiene que empezar con https://';render();return}
     {const [y0,m0,d0]=start.split('-').map(Number),fechas=[...Array(reps)].map((_,i)=>ymd(new Date(y0,m0-1,d0+7*i)));
      const dup=fechas.filter(f=>Object.values(S.games).some(g=>g.type===type&&g.date===f&&g.status!=='closed'));
      if(dup.length&&!confirm('Ya hay una partida '+T(type).name+' programada el '+dup.map(fmtDate).join(', ')+'. ¿Programar otra igual?'))return}
     let first=null;
     for(let i=0;i<reps;i++){
       const [y,m,dd]=start.split('-').map(Number),date=ymd(new Date(y,m-1,dd+7*i));
-      const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||T(type).time||'',title:'',place:LUGAR.place,map:LUGAR.map,status:'open',createdAt:Date.now(),
+      const id=uid('g'),g={tid:TID,type,date,time:ui.newTime||T(type).time||'',title:'',place,map:place===LUGAR.place?map:(ui.newMap!=null&&map!==LUGAR.map?map:''),status:'open',createdAt:Date.now(),
         entry:prev.entry??'',food:'',foodMode:'pp',foodPP:foodModeOf(prev)==='pp'?(prev.foodPP??''):'',levelMin:prev.levelMin||T(type).min,parts:{},result:{},
         timer:{running:false,anchor:0,acc:0,level:0,brk:false}};
       g.rebuyPrice=T(type).rb==='libre'?(prev.rebuyPrice??prev.entry??''):(prev.rebuyPrice??'');
       first=first||id;
       await Store.set('games',id,g);
     }
-    ui.gameId=first;ui.newDate='';ui.newReps=1;render();
+    ui.gameId=first;ui.newDate='';ui.newReps=1;ui.newPlace=null;ui.newMap=null;render();
   },
   st:d=>{
     if(isFB()&&!isAdmin()&&d.pid!==me()){if(!me()){ui.pinFor=d.pid;ui.pinErr=null;render();return}ui.err='Solo podés cambiar tu propia asistencia.';render();return}
