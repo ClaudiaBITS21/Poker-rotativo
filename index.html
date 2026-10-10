@@ -466,6 +466,8 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj{grid-template-columns:calc(49*var(--pw)) minmax(0,1fr)}
 .proj .pmain{justify-self:stretch;min-width:0;padding-left:calc(2.6*var(--pw));padding-right:calc(1.6*var(--pw))}
 .proj .pbl{gap:calc(3.4*var(--pw))}
+/* reloj arriba, debajo el nivel en juego y debajo el próximo */
+.proj .plvl .pbl{flex-direction:column;align-items:flex-start;gap:calc(1.2*var(--ph))}
 .proj .pplayers.one{max-width:calc(30*var(--pw))}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
