@@ -430,7 +430,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .phead{display:flex;align-items:center;gap:calc(1.2*var(--pw));flex-wrap:wrap;font-family:var(--num);font-weight:500;font-size:clamp(16px,calc(2*var(--pw)),32px);color:var(--pmut);text-transform:uppercase;letter-spacing:.08em}
 .proj .phead .brandp{font-family:var(--show);font-weight:400;text-transform:none;letter-spacing:.01em;color:var(--gold)}
 .proj .phead b{color:var(--pfg);font-weight:600}
-.proj .clock{font-size:clamp(64px,min(calc(17.5*var(--pw)),calc(30*var(--ph))),350px);line-height:.85;text-shadow:0 calc(.6*var(--pw)) calc(2*var(--pw)) rgba(0,0,0,.35)}
+.proj .clock{font-size:clamp(64px,min(calc(17.5*var(--pw)),calc(25*var(--ph))),350px);line-height:.85;text-shadow:0 calc(.6*var(--pw)) calc(2*var(--pw)) rgba(0,0,0,.35)}
 .proj .pbl{display:flex;align-items:baseline;gap:calc(2.4*var(--pw));flex-wrap:wrap}
 .proj .pbl .blinds{font-size:clamp(36px,min(calc(8.8*var(--pw)),calc(15*var(--ph))),176px);line-height:.9}
 .proj .pnext{font-family:var(--num);font-size:clamp(18px,calc(2.4*var(--pw)),44px);color:var(--pmut)}
@@ -486,14 +486,14 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:inherit}
 .proj .pmain{justify-content:space-between;gap:calc(1*var(--ph))}
 .proj .plvl{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:calc(.3*var(--ph))}
 .proj .plvl .plab{font-size:clamp(14px,min(calc(1.6*var(--pw)),calc(3*var(--ph))),30px);color:var(--pfg)}
-.proj .pmoney{margin-top:0;gap:calc(2.6*var(--ph));padding-top:calc(2.4*var(--ph))}
+.proj .pmoney{margin-top:0;gap:calc(1.8*var(--ph));padding-top:calc(1.8*var(--ph))}
 .proj .ppotw{display:flex;flex-direction:column;gap:calc(.8*var(--ph))}
 .proj .ppotl{display:flex;align-items:baseline;gap:calc(1.2*var(--pw))}
 .proj .prb{font-family:var(--num);font-weight:500;font-size:clamp(14px,min(calc(1.8*var(--pw)),calc(3.4*var(--ph))),34px);color:var(--pmut)}
-.proj .pprz div{padding:calc(1*var(--ph)) 0!important;gap:calc(.3*var(--ph))!important}
+.proj .pprz div{padding:calc(.8*var(--ph)) 0!important;gap:0!important}
 .proj .pmoney .pprz{flex:none}
 .proj .pplayers{font-size:clamp(11px,min(calc(2*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),32px)!important}
-.proj .ptop{display:flex;flex-direction:column;gap:calc(6*var(--ph))}
+.proj .ptop{display:flex;flex-direction:column;gap:calc(3.5*var(--ph))}
 .proj .pplayers li:not(.ko){min-height:calc(78*var(--ph) / (var(--rows) + 2.6));padding:0!important;box-sizing:border-box}
 .proj.tres .pplayers{font-size:clamp(11px,min(calc(1.65*var(--pw)),calc(46*var(--ph) / (var(--rows) + 2.6))),28px)!important}
 /* teléfono en vertical: la pantalla de juego se gira 90° y se ve apaisada igual */
@@ -1574,7 +1574,7 @@ function renderBig(){
       </div>
       <div class="pmoney">
         <div class="ppotw"><div class="plab">Pozo</div><div class="ppotl"><span class="ppot num">${money(c.pot)}</span><span class="prb num">(${c.rebuys} ${vie?(c.rebuys===1?'rebuy':'rebuys'):(c.rebuys===1?'recompra':'recompras')})</span></div></div>
-        <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b>${t.pts[i]!=null?`<small class="ppts">${t.pts[i]} ${t.pts[i]===1?'punto':'puntos'}</small>`:''}</div>`).join('')}</div>
+        <div class="pprz num">${c.prizes.map((p,i)=>`<div><span>${i+1}º <span style="color:var(--pmut)">${t.split[i]}%</span></span><b>${money(p)}</b></div>`).join('')}</div>
       </div>
     </div>
     <aside class="pside" style="--rows:${Math.max(4,nviv>1?Math.max(...mesasAll(g).map(t=>t.filter(id=>id&&c.playing.includes(id)).length)):c.kos.length?Math.max(c.alive.length,Math.ceil(c.kos.length*.6)):Math.ceil(c.playing.length/(c.playing.length>6?2:1)))}">
