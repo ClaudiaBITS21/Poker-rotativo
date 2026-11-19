@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Poker">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rye&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rye&family=Playfair+Display:ital,wght@0,400;0,700;0,800;0,900;1,800&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
 /* Un solo mundo visual: paño rojo Pelayo (el de nuestra mesa), baranda negra, cartas de papel marfil y línea dorada. */
 :root{
@@ -1728,7 +1728,7 @@ async function tablaPng(){
   const prevPos={};if(last)stats(type,false,last[0]).rows.filter(r=>r.pts>0).forEach((r,i)=>prevPos[r.id]=i+1);
   const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
   const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
-  await Promise.all(['800 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
+  await Promise.all(['800 40px "Playfair Display"','400 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
   const W=1080,P=56,RH=58,head=250,win=last?250:0,H=head+win+70+rows.length*RH+90;
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
   // paño
@@ -1747,10 +1747,10 @@ async function tablaPng(){
     x.fillStyle=V('--gold-2');x.font=`600 24px ${NUM}`;x.fillText(('Ganó el '+new Date(g.date+'T12:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})+(typeKeys().length>1?' · '+T(g.type).name:'')).toUpperCase(),W/2,y+52);
     // ganador y 2º (la cebolla) uno al lado del otro
     const t1='🏆 '+pname(res.p1),t2=res.p2?'🧅 '+pname(res.p2):'',gap=70;
-    x.font=`800 66px ${SER}`;const w1=x.measureText(t1).width;x.font=`700 46px ${SER}`;const w2=t2?x.measureText(t2).width:0;
+    x.font=`800 58px ${SER}`;const w1=x.measureText(t1).width;x.font=`400 58px ${SER}`;const w2=t2?x.measureText(t2).width:0;
     const x0=W/2-(w1+(t2?gap+w2:0))/2;x.textAlign='left';
-    x.fillStyle=V('--ink');x.font=`800 66px ${SER}`;x.fillText(t1,x0,y+128);
-    if(t2){x.font=`700 46px ${SER}`;x.fillText(t2,x0+w1+gap,y+128)}
+    x.fillStyle=V('--ink');x.font=`800 58px ${SER}`;x.fillText(t1,x0,y+128);
+    if(t2){x.font=`400 58px ${SER}`;x.fillText(t2,x0+w1+gap,y+128)}
     x.textAlign='center';
     const extra=[res.p3?'3º '+pname(res.p3):'',c.pot?'Pozo '+money(c.pot):''].filter(Boolean).join('   ·   ');
     if(extra){x.fillStyle=V('--muted');x.font=`600 24px ${BOD}`;x.fillText(extra,W/2,y+180)}
