@@ -1729,7 +1729,7 @@ async function tablaPng(){
   const cs=getComputedStyle(document.documentElement),V=k=>cs.getPropertyValue(k).trim();
   const SER=V('--serif'),NUM=V('--num'),BOD=V('--body');
   await Promise.all(['800 40px "Playfair Display"','600 30px Oswald','500 30px Oswald','600 28px Figtree','400 24px Figtree'].map(f=>document.fonts.load(f).catch(()=>{})));
-  const W=1080,P=56,RH=58,head=250,win=last?250:0,H=head+win+70+rows.length*RH+90;
+  const W=1080,P=56,RH=58,head=250,win=last?300:0,H=head+win+70+rows.length*RH+90;
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
   // paño
   const gr=x.createRadialGradient(W*.4,H*.3,50,W*.5,H*.4,H);gr.addColorStop(0,V('--felt-3'));gr.addColorStop(.5,V('--felt'));gr.addColorStop(1,'#3D0B08');
@@ -1746,8 +1746,10 @@ async function tablaPng(){
     rr(P,y,W-2*P,win-30,22);x.fillStyle=V('--paper');x.fill();x.strokeStyle=V('--gold');x.lineWidth=4;x.stroke();
     x.fillStyle=V('--gold-2');x.font=`600 24px ${NUM}`;x.fillText(('Ganó el '+new Date(g.date+'T12:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})+(typeKeys().length>1?' · '+T(g.type).name:'')).toUpperCase(),W/2,y+52);
     x.fillStyle=V('--ink');x.font=`800 66px ${SER}`;x.fillText('🏆 '+pname(res.p1),W/2,y+128);
-    const otros=['p2','p3'].map((k,i)=>res[k]?`${i+2}º ${pname(res[k])}`:'').filter(Boolean).join('   ·   ');
-    x.fillStyle=V('--muted');x.font=`600 26px ${BOD}`;x.fillText([otros,c.pot?'Pozo '+money(c.pot):''].filter(Boolean).join('   ·   '),W/2,y+180);
+    // el 2º (la cebolla) bien visible, debajo del ganador
+    if(res.p2){x.fillStyle=V('--ink');x.font=`700 40px ${SER}`;x.fillText('🧅 '+pname(res.p2),W/2,y+190)}
+    const extra=[res.p3?'3º '+pname(res.p3):'',c.pot?'Pozo '+money(c.pot):''].filter(Boolean).join('   ·   ');
+    if(extra){x.fillStyle=V('--muted');x.font=`600 24px ${BOD}`;x.fillText(extra,W/2,y+232)}
     y+=win;}
   // tabla
   // columnas fijas: posición, jugador y puntos
